@@ -1,0 +1,1264 @@
+import { useState, useEffect, useCallback } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  useDroppable,
+} from "@dnd-kit/core";
+import type { DragStartEvent, DragEndEvent } from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+
+// ============ TYPES ============
+interface SubItem {
+  id: string;
+  text: string;
+}
+
+interface Item {
+  id: string;
+  text: string;
+  subItems: SubItem[];
+  epic?: string;
+  domain?: string;
+  requiredPoints?: number | "";
+  optionalPoints?: number | "";
+}
+
+interface Sprint {
+  id: string;
+  name: string;
+  multiplier: number;
+}
+
+type GroupId =
+  | "staging"
+  | "committed"
+  | "milestones"
+  | "risks"
+  | "dependencies"
+  | "willNotDo"
+  | "uncommitted";
+
+interface GroupConfig {
+  label: string;
+  color: string;
+  bgColor: string;
+}
+
+interface Stats {
+  required: number;
+  optional: number;
+  percent?: number;
+  remaining?: number;
+}
+
+interface PlannerData {
+  sprints: Sprint[];
+  velocity: number;
+  items: Record<GroupId, Item[]>;
+}
+
+interface DragData {
+  item: Item;
+  groupId: GroupId;
+}
+
+interface DraggableItemProps {
+  item: Item;
+  groupId: GroupId;
+  onUpdate: (itemId: string, updates: Partial<Item>) => void;
+  onDelete: (itemId: string) => void;
+  onDuplicate: (item: Item) => void;
+}
+
+interface DroppableGroupProps {
+  groupId: GroupId;
+  items: Item[];
+  onUpdate: (itemId: string, updates: Partial<Item>) => void;
+  onDelete: (itemId: string) => void;
+  onAdd: (groupId: GroupId) => void;
+  onDuplicate: (groupId: GroupId, item: Item) => void;
+  stats?: Stats;
+}
+
+interface SprintTableProps {
+  sprints: Sprint[];
+  velocity: number;
+  onSprintsChange: (sprints: Sprint[]) => void;
+  onVelocityChange: (velocity: number) => void;
+}
+
+// ============ CONSTANTS ============
+const GROUP_CONFIG: Record<GroupId, GroupConfig> = {
+  staging: { label: "Staging", color: "#64748b", bgColor: "#334155" },
+  committed: { label: "Committed", color: "#1e40af", bgColor: "#1e3a8a" },
+  milestones: { label: "Milestones", color: "#16a34a", bgColor: "#166534" },
+  risks: { label: "Risks", color: "#ea580c", bgColor: "#c2410c" },
+  dependencies: { label: "Dependencies", color: "#0d9488", bgColor: "#0f766e" },
+  willNotDo: { label: "Will Not Do", color: "#dc2626", bgColor: "#b91c1c" },
+  uncommitted: { label: "Uncommitted", color: "#db2777", bgColor: "#be185d" },
+};
+
+const DEFAULT_DATA: PlannerData = {
+  sprints: [
+    { id: "s1", name: "S1", multiplier: 100 },
+    { id: "s2", name: "S2", multiplier: 95 },
+    { id: "s3", name: "S3", multiplier: 90 },
+    { id: "s4", name: "S4", multiplier: 80 },
+    { id: "s5", name: "S5", multiplier: 70 },
+  ],
+  velocity: 34,
+  items: {
+    staging: [],
+    committed: [],
+    milestones: [],
+    risks: [],
+    dependencies: [],
+    willNotDo: [],
+    uncommitted: [],
+  },
+};
+
+// ============ UTILITIES ============
+const generateId = (): string =>
+  `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+const loadFromStorage = (): PlannerData => {
+  try {
+    const saved = localStorage.getItem("sprint-planner-data");
+    if (saved) {
+      const parsed = JSON.parse(saved) as Partial<PlannerData>;
+      // Merge with defaults to handle any missing keys
+      return {
+        ...DEFAULT_DATA,
+        ...parsed,
+        items: { ...DEFAULT_DATA.items, ...parsed.items },
+      };
+    }
+  } catch (e) {
+    console.error("Failed to load from storage:", e);
+  }
+  return DEFAULT_DATA;
+};
+
+const saveToStorage = (data: PlannerData): void => {
+  try {
+    localStorage.setItem("sprint-planner-data", JSON.stringify(data));
+  } catch (e) {
+    console.error("Failed to save to storage:", e);
+  }
+};
+
+// ============ DRAGGABLE ITEM ============
+function DraggableItem({
+  item,
+  groupId,
+  onUpdate,
+  onDelete,
+  onDuplicate,
+}: DraggableItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: item.id,
+    data: { item, groupId } as DragData,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : undefined,
+  };
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState(item);
+
+  // Inline editing state
+  const [isEditingText, setIsEditingText] = useState(false);
+  const [inlineText, setInlineText] = useState(item.text);
+  const [editingSubId, setEditingSubId] = useState<string | null>(null);
+  const [inlineSubText, setInlineSubText] = useState("");
+
+  // Sync inline text with item prop when it changes externally
+  useEffect(() => {
+    setInlineText(item.text);
+  }, [item.text]);
+
+  const startEditingText = () => {
+    setInlineText(item.text);
+    setIsEditingText(true);
+  };
+
+  const handleSave = () => {
+    onUpdate(item.id, editData);
+    setIsEditing(false);
+  };
+
+  const handleInlineTextSave = () => {
+    if (inlineText !== item.text) {
+      onUpdate(item.id, { text: inlineText });
+    }
+    setIsEditingText(false);
+  };
+
+  const handleInlineTextKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleInlineTextSave();
+    } else if (e.key === "Escape") {
+      setInlineText(item.text);
+      setIsEditingText(false);
+    }
+  };
+
+  const handleSubItemClick = (subId: string, text: string) => {
+    setEditingSubId(subId);
+    setInlineSubText(text);
+  };
+
+  const handleSubItemSave = (subId: string) => {
+    const updatedSubItems = item.subItems.map((s) =>
+      s.id === subId ? { ...s, text: inlineSubText } : s,
+    );
+    onUpdate(item.id, { subItems: updatedSubItems });
+    setEditingSubId(null);
+  };
+
+  const handleSubItemKeyDown = (e: React.KeyboardEvent, subId: string) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSubItemSave(subId);
+    } else if (e.key === "Escape") {
+      setEditingSubId(null);
+    }
+  };
+
+  const addInlineSubItem = () => {
+    const newSubId = generateId();
+    const updatedSubItems = [...(item.subItems || []), { id: newSubId, text: "" }];
+    onUpdate(item.id, { subItems: updatedSubItems });
+    // Start editing the new sub-item
+    setTimeout(() => {
+      setEditingSubId(newSubId);
+      setInlineSubText("");
+    }, 0);
+  };
+
+  const addSubItem = () => {
+    setEditData({
+      ...editData,
+      subItems: [...(editData.subItems || []), { id: generateId(), text: "" }],
+    });
+  };
+
+  const updateSubItem = (subId: string, text: string): void => {
+    setEditData({
+      ...editData,
+      subItems: editData.subItems.map((s) =>
+        s.id === subId ? { ...s, text } : s,
+      ),
+    });
+  };
+
+  const removeSubItem = (subId: string): void => {
+    setEditData({
+      ...editData,
+      subItems: editData.subItems.filter((s) => s.id !== subId),
+    });
+  };
+
+  if (isEditing) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-3 mb-2">
+        <input
+          type="text"
+          value={editData.text}
+          onChange={(e) => setEditData({ ...editData, text: e.target.value })}
+          placeholder="Main text..."
+          className="w-full px-2 py-1 border border-slate-300 rounded mb-2 text-sm"
+          autoFocus
+        />
+        <div className="grid grid-cols-2 gap-2 mb-2">
+          <input
+            type="text"
+            value={editData.epic || ""}
+            onChange={(e) => setEditData({ ...editData, epic: e.target.value })}
+            placeholder="Epic (XX-0000)"
+            className="px-2 py-1 border border-slate-300 rounded text-sm"
+          />
+          <input
+            type="text"
+            value={editData.domain || ""}
+            onChange={(e) =>
+              setEditData({ ...editData, domain: e.target.value })
+            }
+            placeholder="Domain"
+            className="px-2 py-1 border border-slate-300 rounded text-sm"
+          />
+          <input
+            type="number"
+            value={editData.requiredPoints || ""}
+            onChange={(e) =>
+              setEditData({
+                ...editData,
+                requiredPoints: e.target.value ? parseInt(e.target.value) : "",
+              })
+            }
+            placeholder="Req pts"
+            className="px-2 py-1 border border-slate-300 rounded text-sm"
+          />
+          <input
+            type="number"
+            value={editData.optionalPoints || ""}
+            onChange={(e) =>
+              setEditData({
+                ...editData,
+                optionalPoints: e.target.value ? parseInt(e.target.value) : "",
+              })
+            }
+            placeholder="Opt pts"
+            className="px-2 py-1 border border-slate-300 rounded text-sm"
+          />
+        </div>
+        <div className="mb-2">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs text-slate-500">Sub-items</span>
+            <button
+              onClick={addSubItem}
+              className="text-xs text-blue-600 hover:text-blue-800"
+            >
+              + Add
+            </button>
+          </div>
+          {(editData.subItems || []).map((sub) => (
+            <div key={sub.id} className="flex gap-1 mb-1">
+              <input
+                type="text"
+                value={sub.text}
+                onChange={(e) => updateSubItem(sub.id, e.target.value)}
+                placeholder="Sub-item text..."
+                className="flex-1 px-2 py-1 border border-slate-300 rounded text-sm"
+              />
+              <button
+                onClick={() => removeSubItem(sub.id)}
+                className="text-red-500 hover:text-red-700 px-2"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={handleSave}
+            className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+          >
+            Save
+          </button>
+          <button
+            onClick={() => {
+              setEditData(item);
+              setIsEditing(false);
+            }}
+            className="px-3 py-1 bg-slate-200 rounded text-sm hover:bg-slate-300"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onDelete(item.id)}
+            className="px-3 py-1 bg-red-100 text-red-600 rounded text-sm hover:bg-red-200 ml-auto"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="bg-white rounded-lg shadow-sm border border-slate-200 mb-1.5 group relative"
+    >
+      <div className="flex items-start px-1.5 py-1">
+        <div
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing p-0.5 mr-1 text-slate-400 hover:text-slate-600 flex-shrink-0"
+        >
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="5" cy="5" r="2" />
+            <circle cx="12" cy="5" r="2" />
+            <circle cx="19" cy="5" r="2" />
+            <circle cx="5" cy="12" r="2" />
+            <circle cx="12" cy="12" r="2" />
+            <circle cx="19" cy="12" r="2" />
+            <circle cx="5" cy="19" r="2" />
+            <circle cx="12" cy="19" r="2" />
+            <circle cx="19" cy="19" r="2" />
+          </svg>
+        </div>
+        <div className="flex-1">
+          {/* Single line: pills + text + points, wraps naturally */}
+          <div className="flex items-center gap-1 flex-wrap">
+            {item.epic && (
+              <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-1 py-0.5 rounded leading-none">
+                {item.epic}
+              </span>
+            )}
+            {item.domain && (
+              <span className="text-[10px] bg-purple-100 text-purple-700 px-1 py-0.5 rounded leading-none">
+                {item.domain}
+              </span>
+            )}
+            {(item.requiredPoints || item.optionalPoints) && (
+              <span className="text-[10px] bg-blue-50 text-blue-600 px-1 py-0.5 rounded leading-none">
+                {item.requiredPoints ? `${item.requiredPoints}p` : ""}
+                {item.requiredPoints && item.optionalPoints ? "+" : ""}
+                {item.optionalPoints ? (
+                  <span className="text-blue-400">{item.optionalPoints}p</span>
+                ) : (
+                  ""
+                )}
+              </span>
+            )}
+            {/* Inline editable main text */}
+            {isEditingText ? (
+              <input
+                type="text"
+                value={inlineText}
+                onChange={(e) => setInlineText(e.target.value)}
+                onBlur={handleInlineTextSave}
+                onKeyDown={handleInlineTextKeyDown}
+                autoFocus
+                className="flex-1 min-w-[80px] text-xs font-medium text-slate-800 bg-transparent border-0 p-0 focus:outline-none focus:ring-0"
+              />
+            ) : (
+              <span
+                onClick={startEditingText}
+                className="text-xs font-medium text-slate-800 cursor-text hover:text-slate-600 break-words"
+              >
+                {item.text || <em className="text-slate-400 italic">Enter text...</em>}
+              </span>
+            )}
+          </div>
+          {/* Inline editable sub-items */}
+          {item.subItems && item.subItems.length > 0 && (
+            <ul className="mt-0.5 ml-2 text-[11px] text-slate-600">
+              {item.subItems.map((sub) => (
+                <li key={sub.id} className="flex items-center">
+                  <span className="text-slate-400 mr-1">•</span>
+                  {editingSubId === sub.id ? (
+                    <input
+                      type="text"
+                      value={inlineSubText}
+                      onChange={(e) => setInlineSubText(e.target.value)}
+                      onBlur={() => handleSubItemSave(sub.id)}
+                      onKeyDown={(e) => handleSubItemKeyDown(e, sub.id)}
+                      autoFocus
+                      className="flex-1 bg-transparent border-0 p-0 focus:outline-none focus:ring-0 text-[11px]"
+                    />
+                  ) : (
+                    <span
+                      onClick={() => handleSubItemClick(sub.id, sub.text)}
+                      className="cursor-text hover:text-slate-800"
+                    >
+                      {sub.text || <em className="text-slate-400">empty</em>}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+      {/* Action buttons - absolutely positioned */}
+      <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 flex items-center gap-0.5 bg-white rounded shadow-sm border border-slate-200 px-0.5 transition-opacity">
+        {/* Add sub-item button */}
+        <button
+          onClick={addInlineSubItem}
+          className="p-0.5 text-slate-400 hover:text-blue-600"
+          title="Add sub-item"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="9 10 4 15 9 20" />
+            <path d="M20 4v7a4 4 0 0 1-4 4H4" />
+          </svg>
+        </button>
+        {/* Duplicate button */}
+        <button
+          onClick={() => onDuplicate(item)}
+          className="p-0.5 text-slate-400 hover:text-green-600"
+          title="Duplicate"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </svg>
+        </button>
+        {/* Edit button */}
+        <button
+          onClick={() => {
+            setEditData(item);
+            setIsEditing(true);
+          }}
+          className="p-0.5 text-slate-400 hover:text-slate-600"
+          title="Edit"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ============ DROPPABLE GROUP ============
+function DroppableGroup({
+  groupId,
+  items,
+  onUpdate,
+  onDelete,
+  onAdd,
+  onDuplicate,
+  stats,
+}: DroppableGroupProps) {
+  const config = GROUP_CONFIG[groupId];
+  const { setNodeRef, isOver } = useDroppable({ id: groupId });
+
+  const formatItemsForExport = (): string => {
+    const letters = "abcdefghijklmnopqrstuvwxyz";
+    return items
+      .map((item, idx) => {
+        const num = idx + 1;
+        const parts: string[] = [];
+        
+        // Build the main line: "1. [Domain] - Title (EPIC)"
+        let mainLine = `${num}.`;
+        if (item.domain) {
+          mainLine += ` [${item.domain}]`;
+        }
+        if (item.text) {
+          mainLine += item.domain ? ` - ${item.text}` : ` ${item.text}`;
+        }
+        if (item.epic) {
+          mainLine += ` (${item.epic})`;
+        }
+        parts.push(mainLine);
+        
+        // Add sub-items with tab indent and letter prefix
+        if (item.subItems && item.subItems.length > 0) {
+          item.subItems.forEach((sub, subIdx) => {
+            if (sub.text) {
+              const letter = letters[subIdx] || String(subIdx + 1);
+              parts.push(`\t${letter}. ${sub.text}`);
+            }
+          });
+        }
+        
+        return parts.join("\n");
+      })
+      .filter(Boolean)
+      .join("\n");
+  };
+
+  const handleExport = async () => {
+    const text = formatItemsForExport();
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      // Brief visual feedback could be added here
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      <div
+        className="rounded-t-lg px-3 py-2"
+        style={{ backgroundColor: config.bgColor }}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <h3 className="font-semibold text-white text-sm">{config.label}</h3>
+            {items.length > 0 && (
+              <button
+                onClick={handleExport}
+                className="p-0.5 text-white/60 hover:text-white transition-colors"
+                title="Copy to clipboard"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                  <polyline points="16 6 12 2 8 6" />
+                  <line x1="12" y1="2" x2="12" y2="15" />
+                </svg>
+              </button>
+            )}
+          </div>
+          {stats && (
+            <span className="text-xs text-white/80">
+              {stats.required}p req
+              {stats.optional > 0 && ` + ${stats.optional}p opt`}
+              {stats.percent !== undefined && ` • ${stats.percent}%`}
+              {stats.remaining !== undefined && ` • ${stats.remaining}p left`}
+            </span>
+          )}
+        </div>
+      </div>
+      <div
+        ref={setNodeRef}
+        className={`flex-1 bg-slate-50 p-2 rounded-b-lg border-2 border-t-0 transition-colors overflow-y-auto ${
+          isOver ? "border-blue-400 bg-blue-50" : "border-slate-200"
+        }`}
+        style={{ minHeight: "120px" }}
+      >
+        <SortableContext
+          items={items.map((i) => i.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          {items.map((item) => (
+            <DraggableItem
+              key={item.id}
+              item={item}
+              groupId={groupId}
+              onUpdate={onUpdate}
+              onDelete={onDelete}
+              onDuplicate={(i) => onDuplicate(groupId, i)}
+            />
+          ))}
+        </SortableContext>
+        <button
+          onClick={() => onAdd(groupId)}
+          className="w-full py-2 text-sm text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded border border-dashed border-slate-300 transition-colors"
+        >
+          + Add Item
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ============ COMMITTED STATS PANEL ============
+interface DomainStat {
+  name: string;
+  points: number;
+  percent: number;
+}
+
+const DOMAIN_COLORS: Record<string, string> = {
+  Incentives: "#3b82f6",
+  Margins: "#10b981",
+  Budgets: "#f59e0b",
+  Audiences: "#8b5cf6",
+  Signal: "#ec4899",
+  Unassigned: "#94a3b8",
+};
+
+function getDomainColor(domain: string): string {
+  return (
+    DOMAIN_COLORS[domain] ||
+    `hsl(${Math.abs(domain.split("").reduce((a, c) => a + c.charCodeAt(0), 0)) % 360}, 60%, 50%)`
+  );
+}
+
+interface CommittedStatsPanelProps {
+  committedPercent: number;
+  domainStats: DomainStat[];
+  totalPoints: number;
+  committedPoints: number;
+}
+
+function CommittedStatsPanel({
+  committedPercent,
+  domainStats,
+  totalPoints,
+  committedPoints,
+}: CommittedStatsPanelProps) {
+  return (
+    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-2 mb-2">
+      {/* Committed Progress Bar */}
+      <div className={domainStats.length > 0 ? "mb-1.5" : ""}>
+        <div className="flex items-center justify-between mb-0.5">
+          <span className="text-xs font-medium text-slate-600">Committed</span>
+          <span className="text-[11px] text-slate-500">
+            {committedPoints}p / {Math.round(totalPoints)}p
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="flex-1 h-2.5 bg-slate-200 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all ${
+                committedPercent > 100
+                  ? "bg-red-500"
+                  : committedPercent > 80
+                    ? "bg-amber-500"
+                    : "bg-blue-500"
+              }`}
+              style={{ width: `${Math.min(committedPercent, 100)}%` }}
+            />
+          </div>
+          <span
+            className={`text-xs font-semibold w-8 text-right ${
+              committedPercent > 100
+                ? "text-red-600"
+                : committedPercent > 80
+                  ? "text-amber-600"
+                  : "text-blue-600"
+            }`}
+          >
+            {committedPercent}%
+          </span>
+        </div>
+      </div>
+
+      {/* Domain Breakdown */}
+      {domainStats.length > 0 && (
+        <div>
+          {/* Stacked bar */}
+          <div className="h-2.5 bg-slate-100 rounded overflow-hidden flex mb-1">
+            {domainStats.map((d) => (
+              <div
+                key={d.name}
+                className="h-full transition-all"
+                style={{
+                  width: `${d.percent}%`,
+                  backgroundColor: getDomainColor(d.name),
+                }}
+                title={`${d.name}: ${d.points}p (${d.percent}%)`}
+              />
+            ))}
+          </div>
+          {/* Legend */}
+          <div className="space-y-0.5">
+            {domainStats.map((d) => (
+              <div key={d.name} className="flex items-center text-[11px]">
+                <div
+                  className="w-2 h-2 rounded-sm mr-1 flex-shrink-0"
+                  style={{ backgroundColor: getDomainColor(d.name) }}
+                />
+                <span className="flex-1 text-slate-600 truncate">{d.name}</span>
+                <span className="text-slate-500 ml-1 tabular-nums">{d.points}p</span>
+                <span className="text-slate-400 ml-0.5 w-7 text-right tabular-nums">
+                  {d.percent}%
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============ SPRINT TABLE (Compact Sidebar Version) ============
+function SprintTable({
+  sprints,
+  velocity,
+  onSprintsChange,
+  onVelocityChange,
+}: SprintTableProps) {
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    try {
+      const saved = localStorage.getItem("sprint-planner-velocity-collapsed");
+      return saved === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleCollapse = () => {
+    const newValue = !isCollapsed;
+    setIsCollapsed(newValue);
+    try {
+      localStorage.setItem(
+        "sprint-planner-velocity-collapsed",
+        String(newValue),
+      );
+    } catch {
+      // Ignore storage errors
+    }
+  };
+
+  const addSprint = () => {
+    const newSprint = {
+      id: generateId(),
+      name: `S${sprints.length + 1}`,
+      multiplier:
+        sprints.length > 0
+          ? Math.max(40, sprints[sprints.length - 1].multiplier - 10)
+          : 100,
+    };
+    onSprintsChange([...sprints, newSprint]);
+  };
+
+  const updateSprint = (
+    id: string,
+    field: keyof Sprint,
+    value: string | number,
+  ): void => {
+    onSprintsChange(
+      sprints.map((s) => (s.id === id ? { ...s, [field]: value } : s)),
+    );
+  };
+
+  const removeSprint = (id: string): void => {
+    onSprintsChange(sprints.filter((s) => s.id !== id));
+  };
+
+  const totalPoints = sprints.reduce(
+    (sum, s) => sum + velocity * (s.multiplier / 100),
+    0,
+  );
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-2 mb-2">
+      <div
+        className="flex items-center justify-between cursor-pointer hover:bg-slate-50 -m-2 p-2 rounded-lg transition-colors"
+        onClick={toggleCollapse}
+      >
+        <div className="flex items-center gap-1.5">
+          <div
+            className={`w-5 h-5 rounded flex items-center justify-center bg-slate-100 hover:bg-slate-200 transition-colors ${isCollapsed ? "" : "bg-slate-200"}`}
+          >
+            <svg
+              className={`w-3 h-3 text-slate-600 transition-transform ${isCollapsed ? "" : "rotate-90"}`}
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <path
+                fillRule="evenodd"
+                d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </div>
+          <span className="font-medium text-slate-700 text-xs">Velocity</span>
+        </div>
+        <div
+          className="flex items-center gap-1.5"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <input
+            type="number"
+            value={velocity}
+            onChange={(e) => onVelocityChange(parseInt(e.target.value) || 0)}
+            className="w-10 px-1 py-0.5 border border-slate-300 rounded text-center text-[11px]"
+          />
+          <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">
+            {totalPoints.toFixed(0)}p
+          </span>
+        </div>
+      </div>
+      {!isCollapsed && (
+        <>
+          <div className="space-y-0.5 mt-1.5">
+            {sprints.map((sprint) => {
+              const adjusted = velocity * (sprint.multiplier / 100);
+              return (
+                <div
+                  key={sprint.id}
+                  className="flex items-center gap-1 text-[11px] bg-slate-50 rounded px-1.5 py-0.5"
+                >
+                  <input
+                    type="text"
+                    value={sprint.name}
+                    onChange={(e) =>
+                      updateSprint(sprint.id, "name", e.target.value)
+                    }
+                    className="w-8 px-0.5 py-0.5 border border-slate-200 rounded text-[11px] text-center"
+                  />
+                  <input
+                    type="number"
+                    value={sprint.multiplier}
+                    onChange={(e) =>
+                      updateSprint(
+                        sprint.id,
+                        "multiplier",
+                        parseFloat(e.target.value) || 0,
+                      )
+                    }
+                    className="w-12 px-1 py-0.5 border border-slate-200 rounded text-center text-[11px]"
+                    min="0"
+                    max="100"
+                    step="5"
+                  />
+                  <span className="text-slate-400 text-[10px]">%</span>
+                  <span className="flex-1 text-right font-medium text-slate-600">
+                    {adjusted.toFixed(0)}p
+                  </span>
+                  <button
+                    onClick={() => removeSprint(sprint.id)}
+                    className="text-red-400 hover:text-red-600 text-sm leading-none"
+                  >
+                    ×
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <button
+            onClick={addSprint}
+            className="mt-1 text-[11px] text-blue-600 hover:text-blue-800"
+          >
+            + Add Sprint
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ============ MAIN APP ============
+export default function SprintPlanner() {
+  const [data, setData] = useState<PlannerData>(loadFromStorage);
+  const [_activeId, setActiveId] = useState<string | null>(null);
+  const [activeItem, setActiveItem] = useState<DragData | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
+
+  // Save to storage whenever data changes
+  useEffect(() => {
+    saveToStorage(data);
+  }, [data]);
+
+  // Calculate statistics
+  const calcStats = useCallback(
+    (groupId: GroupId): { required: number; optional: number } => {
+      const items = data.items[groupId] || [];
+      const required = items.reduce(
+        (sum, item) =>
+          sum +
+          (typeof item.requiredPoints === "number" ? item.requiredPoints : 0),
+        0,
+      );
+      const optional = items.reduce(
+        (sum, item) =>
+          sum +
+          (typeof item.optionalPoints === "number" ? item.optionalPoints : 0),
+        0,
+      );
+      return { required, optional };
+    },
+    [data.items],
+  );
+
+  const totalPlanningPoints = data.sprints.reduce(
+    (sum, s) => sum + data.velocity * (s.multiplier / 100),
+    0,
+  );
+  const committedStats = calcStats("committed");
+  const committedPercent =
+    totalPlanningPoints > 0
+      ? Math.round((committedStats.required / totalPlanningPoints) * 100)
+      : 0;
+  const committedRemaining = Math.round(
+    totalPlanningPoints - committedStats.required,
+  );
+
+  // Calculate domain breakdown for committed items
+  const domainBreakdown = useCallback(() => {
+    const domains: Record<string, number> = {};
+    const committedItems = data.items.committed || [];
+    let totalPoints = 0;
+
+    committedItems.forEach((item) => {
+      const points =
+        typeof item.requiredPoints === "number" ? item.requiredPoints : 0;
+      if (points > 0) {
+        const domain = item.domain || "Unassigned";
+        domains[domain] = (domains[domain] || 0) + points;
+        totalPoints += points;
+      }
+    });
+
+    return Object.entries(domains)
+      .map(([name, points]) => ({
+        name,
+        points,
+        percent: totalPoints > 0 ? Math.round((points / totalPoints) * 100) : 0,
+      }))
+      .sort((a, b) => b.points - a.points);
+  }, [data.items.committed]);
+
+  const domainStats = domainBreakdown();
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    setActiveId(active.id as string);
+    setActiveItem(active.data.current as DragData);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+    setActiveItem(null);
+
+    if (!over) return;
+
+    const activeId = active.id as string;
+    const overId = over.id as string;
+
+    if (activeId === overId) return;
+
+    const dragData = active.data.current as DragData;
+    const sourceGroup = dragData.groupId;
+
+    // Check if dropping on a group or on another item
+    const isOverGroup = Object.keys(GROUP_CONFIG).includes(overId);
+    
+    if (isOverGroup) {
+      // Moving to a different group (drop zone)
+      const destGroup = overId as GroupId;
+      if (sourceGroup === destGroup) return;
+
+      const item = dragData.item;
+      setData((prev) => ({
+        ...prev,
+        items: {
+          ...prev.items,
+          [sourceGroup]: prev.items[sourceGroup].filter((i) => i.id !== item.id),
+          [destGroup]: [...prev.items[destGroup], item],
+        },
+      }));
+    } else {
+      // Dropping on another item - could be same group or different group
+      const overData = over.data.current as DragData | undefined;
+      const destGroup = overData?.groupId || sourceGroup;
+
+      if (sourceGroup === destGroup) {
+        // Reordering within same group
+        setData((prev) => {
+          const items = prev.items[sourceGroup];
+          const oldIndex = items.findIndex((i) => i.id === activeId);
+          const newIndex = items.findIndex((i) => i.id === overId);
+
+          if (oldIndex === -1 || newIndex === -1) return prev;
+
+          return {
+            ...prev,
+            items: {
+              ...prev.items,
+              [sourceGroup]: arrayMove(items, oldIndex, newIndex),
+            },
+          };
+        });
+      } else {
+        // Moving to different group, insert at position
+        const item = dragData.item;
+        setData((prev) => {
+          const destItems = prev.items[destGroup];
+          const newIndex = destItems.findIndex((i) => i.id === overId);
+
+          const newDestItems = [...destItems];
+          newDestItems.splice(newIndex === -1 ? destItems.length : newIndex, 0, item);
+
+          return {
+            ...prev,
+            items: {
+              ...prev.items,
+              [sourceGroup]: prev.items[sourceGroup].filter((i) => i.id !== item.id),
+              [destGroup]: newDestItems,
+            },
+          };
+        });
+      }
+    }
+  };
+
+  const handleAddItem = (groupId: GroupId): void => {
+    const newItem: Item = {
+      id: generateId(),
+      text: "",
+      subItems: [],
+      epic: "",
+      domain: "",
+      requiredPoints: "",
+      optionalPoints: "",
+    };
+    setData((prev) => ({
+      ...prev,
+      items: {
+        ...prev.items,
+        [groupId]: [...prev.items[groupId], newItem],
+      },
+    }));
+  };
+
+  const handleDuplicateItem = (groupId: GroupId, item: Item): void => {
+    const duplicatedItem: Item = {
+      ...item,
+      id: generateId(),
+      text: item.text ? `${item.text} (copy)` : "",
+      subItems: item.subItems.map((sub) => ({ ...sub, id: generateId() })),
+    };
+    setData((prev) => ({
+      ...prev,
+      items: {
+        ...prev.items,
+        [groupId]: [...prev.items[groupId], duplicatedItem],
+      },
+    }));
+  };
+
+  const handleUpdateItem =
+    (groupId: GroupId) =>
+    (itemId: string, updates: Partial<Item>): void => {
+      setData((prev) => ({
+        ...prev,
+        items: {
+          ...prev.items,
+          [groupId]: prev.items[groupId].map((item) =>
+            item.id === itemId ? { ...item, ...updates } : item,
+          ),
+        },
+      }));
+    };
+
+  const handleDeleteItem =
+    (groupId: GroupId) =>
+    (itemId: string): void => {
+      setData((prev) => ({
+        ...prev,
+        items: {
+          ...prev.items,
+          [groupId]: prev.items[groupId].filter((item) => item.id !== itemId),
+        },
+      }));
+    };
+
+  return (
+    <div className="min-h-screen bg-slate-800 p-4">
+      <div className="max-w-[1800px] mx-auto">
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="flex gap-4 h-[calc(100vh-32px)]">
+            {/* Left Sidebar: Stats + Sprint Table + Staging */}
+            <div className="w-64 flex-shrink-0 flex flex-col">
+              <CommittedStatsPanel
+                committedPercent={committedPercent}
+                domainStats={domainStats}
+                totalPoints={totalPlanningPoints}
+                committedPoints={committedStats.required}
+              />
+              <SprintTable
+                sprints={data.sprints}
+                velocity={data.velocity}
+                onSprintsChange={(sprints) =>
+                  setData((prev) => ({ ...prev, sprints }))
+                }
+                onVelocityChange={(velocity) =>
+                  setData((prev) => ({ ...prev, velocity }))
+                }
+              />
+              <div className="flex-1 min-h-0">
+                <DroppableGroup
+                  groupId="staging"
+                  items={data.items.staging}
+                  onUpdate={handleUpdateItem("staging")}
+                  onDelete={handleDeleteItem("staging")}
+                  onAdd={handleAddItem}
+                  onDuplicate={handleDuplicateItem}
+                  stats={calcStats("staging")}
+                />
+              </div>
+            </div>
+
+            {/* Main Content Grid */}
+            <div className="flex-1 grid grid-cols-3 grid-rows-2 gap-3 min-h-0">
+              <DroppableGroup
+                groupId="committed"
+                items={data.items.committed}
+                onUpdate={handleUpdateItem("committed")}
+                onDelete={handleDeleteItem("committed")}
+                onAdd={handleAddItem}
+                onDuplicate={handleDuplicateItem}
+                stats={{
+                  ...committedStats,
+                  percent: committedPercent,
+                  remaining: committedRemaining,
+                }}
+              />
+              <DroppableGroup
+                groupId="milestones"
+                items={data.items.milestones}
+                onUpdate={handleUpdateItem("milestones")}
+                onDelete={handleDeleteItem("milestones")}
+                onAdd={handleAddItem}
+                onDuplicate={handleDuplicateItem}
+              />
+              <DroppableGroup
+                groupId="risks"
+                items={data.items.risks}
+                onUpdate={handleUpdateItem("risks")}
+                onDelete={handleDeleteItem("risks")}
+                onAdd={handleAddItem}
+                onDuplicate={handleDuplicateItem}
+              />
+              <DroppableGroup
+                groupId="dependencies"
+                items={data.items.dependencies}
+                onUpdate={handleUpdateItem("dependencies")}
+                onDelete={handleDeleteItem("dependencies")}
+                onAdd={handleAddItem}
+                onDuplicate={handleDuplicateItem}
+              />
+              <DroppableGroup
+                groupId="willNotDo"
+                items={data.items.willNotDo}
+                onUpdate={handleUpdateItem("willNotDo")}
+                onDelete={handleDeleteItem("willNotDo")}
+                onAdd={handleAddItem}
+                onDuplicate={handleDuplicateItem}
+                stats={calcStats("willNotDo")}
+              />
+              <DroppableGroup
+                groupId="uncommitted"
+                items={data.items.uncommitted}
+                onUpdate={handleUpdateItem("uncommitted")}
+                onDelete={handleDeleteItem("uncommitted")}
+                onAdd={handleAddItem}
+                onDuplicate={handleDuplicateItem}
+                stats={calcStats("uncommitted")}
+              />
+            </div>
+          </div>
+
+          <DragOverlay>
+            {activeItem && (
+              <div className="bg-white rounded-lg shadow-lg border-2 border-blue-400 p-2 opacity-90">
+                <div className="text-sm font-medium">
+                  {activeItem.item.text || "Untitled"}
+                </div>
+              </div>
+            )}
+          </DragOverlay>
+        </DndContext>
+      </div>
+    </div>
+  );
+}
