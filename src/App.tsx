@@ -78,6 +78,7 @@ interface DraggableItemProps {
   onUpdate: (itemId: string, updates: Partial<Item>) => void;
   onDelete: (itemId: string) => void;
   onDuplicate: (item: Item) => void;
+  onReorder: (itemId: string, direction: "up" | "down") => void;
 }
 
 interface DroppableGroupProps {
@@ -87,6 +88,7 @@ interface DroppableGroupProps {
   onDelete: (itemId: string) => void;
   onAdd: (groupId: GroupId) => void;
   onDuplicate: (groupId: GroupId, item: Item) => void;
+  onReorder: (groupId: GroupId, itemId: string, direction: "up" | "down") => void;
   stats?: Stats;
 }
 
@@ -165,6 +167,7 @@ function DraggableItem({
   onUpdate,
   onDelete,
   onDuplicate,
+  onReorder,
 }: DraggableItemProps) {
   const {
     attributes,
@@ -217,12 +220,50 @@ function DraggableItem({
   };
 
   const handleInlineTextKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
+    if (e.key === "Enter" && e.shiftKey) {
+      e.preventDefault();
+      // Save current text and create new sub-item
+      if (inlineText !== item.text) {
+        onUpdate(item.id, { text: inlineText });
+      }
+      setIsEditingText(false);
+      addInlineSubItem();
+    } else if (e.key === "Enter") {
       e.preventDefault();
       handleInlineTextSave();
     } else if (e.key === "Escape") {
       setInlineText(item.text);
       setIsEditingText(false);
+    } else if (e.key === "Tab") {
+      if (e.shiftKey) {
+        // Shift+Tab: save and let browser handle going to previous element
+        if (inlineText !== item.text) {
+          onUpdate(item.id, { text: inlineText });
+        }
+        setTimeout(() => {
+          setIsEditingText(false);
+        }, 0);
+      } else if (item.subItems && item.subItems.length > 0) {
+        // Tab to first sub-item if exists
+        e.preventDefault();
+        if (inlineText !== item.text) {
+          onUpdate(item.id, { text: inlineText });
+        }
+        setIsEditingText(false);
+        const firstSub = item.subItems[0];
+        setTimeout(() => {
+          setEditingSubId(firstSub.id);
+          setInlineSubText(firstSub.text);
+        }, 0);
+      } else {
+        // No sub-items, save and let browser handle Tab to next element
+        if (inlineText !== item.text) {
+          onUpdate(item.id, { text: inlineText });
+        }
+        setTimeout(() => {
+          setIsEditingText(false);
+        }, 0);
+      }
     }
   };
 
@@ -240,11 +281,92 @@ function DraggableItem({
   };
 
   const handleSubItemKeyDown = (e: React.KeyboardEvent, subId: string) => {
-    if (e.key === "Enter") {
+    if (e.key === "Enter" && e.shiftKey) {
+      e.preventDefault();
+      // Save current sub-item and create new one after it
+      const currentIndex = item.subItems.findIndex((s) => s.id === subId);
+      const newSubId = generateId();
+      const updatedSubItems = item.subItems.map((s) =>
+        s.id === subId ? { ...s, text: inlineSubText } : s
+      );
+      // Insert new sub-item after current one
+      updatedSubItems.splice(currentIndex + 1, 0, { id: newSubId, text: "" });
+      onUpdate(item.id, { subItems: updatedSubItems });
+      // Focus on new sub-item
+      setTimeout(() => {
+        setEditingSubId(newSubId);
+        setInlineSubText("");
+      }, 0);
+    } else if (e.key === "Enter") {
       e.preventDefault();
       handleSubItemSave(subId);
     } else if (e.key === "Escape") {
       setEditingSubId(null);
+    } else if (e.key === "Tab") {
+      const currentIndex = item.subItems.findIndex((s) => s.id === subId);
+      // Save current sub-item
+      const updatedSubItems = item.subItems.map((s) =>
+        s.id === subId ? { ...s, text: inlineSubText } : s
+      );
+      onUpdate(item.id, { subItems: updatedSubItems });
+
+      if (e.shiftKey) {
+        // Shift+Tab: go to previous sub-item or main text
+        e.preventDefault();
+        if (currentIndex > 0) {
+          const prevSub = item.subItems[currentIndex - 1];
+          setTimeout(() => {
+            setEditingSubId(prevSub.id);
+            setInlineSubText(prevSub.text);
+          }, 0);
+        } else {
+          // Go to main text
+          setEditingSubId(null);
+          setTimeout(() => {
+            setInlineText(item.text);
+            setIsEditingText(true);
+          }, 0);
+        }
+      } else {
+        // Tab: go to next sub-item or let browser handle if last
+        if (currentIndex < item.subItems.length - 1) {
+          e.preventDefault();
+          const nextSub = item.subItems[currentIndex + 1];
+          setTimeout(() => {
+            setEditingSubId(nextSub.id);
+            setInlineSubText(nextSub.text);
+          }, 0);
+        } else {
+          // Last sub-item, let browser handle Tab to next element
+          // Use timeout so browser Tab action completes before input unmounts
+          setTimeout(() => {
+            setEditingSubId(null);
+          }, 0);
+        }
+      }
+    } else if (e.key === "Backspace" && inlineSubText === "") {
+      e.preventDefault();
+      // Find the index of the current sub-item
+      const currentIndex = item.subItems.findIndex((s) => s.id === subId);
+      // Remove the sub-item
+      const updatedSubItems = item.subItems.filter((s) => s.id !== subId);
+      onUpdate(item.id, { subItems: updatedSubItems });
+
+      // Focus on previous sub-item or main text
+      if (currentIndex > 0) {
+        const prevSub = item.subItems[currentIndex - 1];
+        setTimeout(() => {
+          setEditingSubId(prevSub.id);
+          setInlineSubText(prevSub.text);
+        }, 0);
+      } else {
+        // Focus on main text
+        setEditingSubId(null);
+        setTimeout(() => {
+          setInlineText(item.text);
+          setIsEditingText(true);
+        }, 0);
+      }
     }
   };
 
@@ -400,7 +522,16 @@ function DraggableItem({
         <div
           {...attributes}
           {...listeners}
-          className="cursor-grab active:cursor-grabbing p-0.5 mr-1 text-slate-400 hover:text-slate-600 flex-shrink-0"
+          onKeyDown={(e) => {
+            if (e.key === "ArrowUp") {
+              e.preventDefault();
+              onReorder(item.id, "up");
+            } else if (e.key === "ArrowDown") {
+              e.preventDefault();
+              onReorder(item.id, "down");
+            }
+          }}
+          className="cursor-grab active:cursor-grabbing p-0.5 mr-1 text-slate-400 hover:text-slate-600 flex-shrink-0 focus:text-blue-500 focus:outline-none"
         >
           <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
             <circle cx="5" cy="5" r="2" />
@@ -418,26 +549,40 @@ function DraggableItem({
           {/* Single line: pills + text + points, wraps naturally */}
           <div className="flex items-center gap-1 flex-wrap">
             {item.epic && (
-              <span className="text-[10px] font-mono bg-slate-100 text-slate-600 px-1 py-0.5 rounded leading-none">
+              <a
+                href={`https://purecars.atlassian.net/browse/${item.epic}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="text-[10px] font-mono bg-blue-50 text-blue-600 px-1 py-0.5 rounded leading-none underline hover:bg-blue-100 transition-colors"
+              >
                 {item.epic}
-              </span>
+              </a>
             )}
             {item.domain && (
               <span className="text-[10px] bg-purple-100 text-purple-700 px-1 py-0.5 rounded leading-none">
                 {item.domain}
               </span>
             )}
-            {(item.requiredPoints || item.optionalPoints) && (
-              <span className="text-[10px] bg-blue-50 text-blue-600 px-1 py-0.5 rounded leading-none">
-                {item.requiredPoints ? `${item.requiredPoints}p` : ""}
-                {item.requiredPoints && item.optionalPoints ? "+" : ""}
-                {item.optionalPoints ? (
-                  <span className="text-blue-400">{item.optionalPoints}p</span>
-                ) : (
-                  ""
-                )}
-              </span>
-            )}
+            {(item.requiredPoints || item.optionalPoints) && (() => {
+              const totalPoints =
+                (typeof item.requiredPoints === "number" ? item.requiredPoints : parseInt(item.requiredPoints || "0") || 0) +
+                (typeof item.optionalPoints === "number" ? item.optionalPoints : parseInt(item.optionalPoints || "0") || 0);
+              const pointsColorClass =
+                totalPoints >= 36 ? "bg-red-200 text-red-800" :
+                totalPoints >= 26 ? "bg-red-100 text-red-600" :
+                totalPoints >= 16 ? "bg-orange-100 text-orange-700" :
+                totalPoints >= 11 ? "bg-yellow-100 text-yellow-700" :
+                totalPoints >= 6 ? "bg-green-200 text-green-800" :
+                "bg-green-100 text-green-600";
+              return (
+                <span className={`text-[10px] px-1 py-0.5 rounded leading-none ${pointsColorClass}`}>
+                  {item.requiredPoints ? `${item.requiredPoints}p` : ""}
+                  {item.requiredPoints && item.optionalPoints ? "+" : ""}
+                  {item.optionalPoints ? `${item.optionalPoints}p` : ""}
+                </span>
+              );
+            })()}
             {/* Inline editable main text */}
             {isEditingText ? (
               <input
@@ -447,12 +592,14 @@ function DraggableItem({
                 onBlur={handleInlineTextSave}
                 onKeyDown={handleInlineTextKeyDown}
                 autoFocus
-                className="flex-1 min-w-[80px] text-xs font-medium text-slate-800 bg-transparent border-0 p-0 focus:outline-none focus:ring-0"
+                className="flex-1 min-w-[80px] text-xs font-medium text-blue-700 bg-transparent border-0 p-0 focus:outline-none focus:ring-0"
               />
             ) : (
               <span
+                tabIndex={0}
                 onClick={startEditingText}
-                className="text-xs font-medium text-slate-800 cursor-text hover:text-slate-600 break-words"
+                onFocus={startEditingText}
+                className="text-xs font-medium text-slate-800 cursor-text hover:text-slate-600 break-words focus:outline-none"
               >
                 {item.text || <em className="text-slate-400 italic">Enter text...</em>}
               </span>
@@ -463,7 +610,7 @@ function DraggableItem({
             <ul className="mt-0.5 ml-2 text-[11px] text-slate-600">
               {item.subItems.map((sub) => (
                 <li key={sub.id} className="flex items-center">
-                  <span className="text-slate-400 mr-1">•</span>
+                  <span className={`mr-1 transition-colors ${editingSubId === sub.id ? "text-blue-500" : "text-slate-400"}`}>•</span>
                   {editingSubId === sub.id ? (
                     <input
                       type="text"
@@ -472,12 +619,14 @@ function DraggableItem({
                       onBlur={() => handleSubItemSave(sub.id)}
                       onKeyDown={(e) => handleSubItemKeyDown(e, sub.id)}
                       autoFocus
-                      className="flex-1 bg-transparent border-0 p-0 focus:outline-none focus:ring-0 text-[11px]"
+                      className="flex-1 bg-transparent border-0 p-0 focus:outline-none focus:ring-0 text-[11px] text-blue-700"
                     />
                   ) : (
                     <span
+                      tabIndex={0}
                       onClick={() => handleSubItemClick(sub.id, sub.text)}
-                      className="cursor-text hover:text-slate-800"
+                      onFocus={() => handleSubItemClick(sub.id, sub.text)}
+                      className="cursor-text hover:text-slate-800 focus:outline-none"
                     >
                       {sub.text || <em className="text-slate-400">empty</em>}
                     </span>
@@ -489,7 +638,7 @@ function DraggableItem({
         </div>
       </div>
       {/* Action buttons - absolutely positioned */}
-      <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 flex items-center gap-0.5 bg-white rounded shadow-sm border border-slate-200 px-0.5 transition-opacity">
+      <div className="absolute -top-2 right-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 flex items-center gap-0.5 bg-white rounded shadow-sm border border-slate-200 px-0.5 transition-opacity">
         {/* Add sub-item button */}
         <button
           onClick={addInlineSubItem}
@@ -539,6 +688,7 @@ function DroppableGroup({
   onDelete,
   onAdd,
   onDuplicate,
+  onReorder,
   stats,
 }: DroppableGroupProps) {
   const config = GROUP_CONFIG[groupId];
@@ -643,6 +793,7 @@ function DroppableGroup({
               onUpdate={onUpdate}
               onDelete={onDelete}
               onDuplicate={(i) => onDuplicate(groupId, i)}
+              onReorder={(itemId, dir) => onReorder(groupId, itemId, dir)}
             />
           ))}
         </SortableContext>
@@ -1121,6 +1272,28 @@ export default function SprintPlanner() {
     }));
   };
 
+  const handleReorderItem = (groupId: GroupId, itemId: string, direction: "up" | "down"): void => {
+    setData((prev) => {
+      const items = prev.items[groupId];
+      const currentIndex = items.findIndex((i) => i.id === itemId);
+      if (currentIndex === -1) return prev;
+
+      const newIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+      if (newIndex < 0 || newIndex >= items.length) return prev;
+
+      const newItems = [...items];
+      [newItems[currentIndex], newItems[newIndex]] = [newItems[newIndex], newItems[currentIndex]];
+
+      return {
+        ...prev,
+        items: {
+          ...prev.items,
+          [groupId]: newItems,
+        },
+      };
+    });
+  };
+
   const handleUpdateItem =
     (groupId: GroupId) =>
     (itemId: string, updates: Partial<Item>): void => {
@@ -1183,6 +1356,7 @@ export default function SprintPlanner() {
                   onDelete={handleDeleteItem("staging")}
                   onAdd={handleAddItem}
                   onDuplicate={handleDuplicateItem}
+                  onReorder={handleReorderItem}
                   stats={calcStats("staging")}
                 />
               </div>
@@ -1197,6 +1371,7 @@ export default function SprintPlanner() {
                 onDelete={handleDeleteItem("committed")}
                 onAdd={handleAddItem}
                 onDuplicate={handleDuplicateItem}
+                onReorder={handleReorderItem}
                 stats={{
                   ...committedStats,
                   percent: committedPercent,
@@ -1210,6 +1385,7 @@ export default function SprintPlanner() {
                 onDelete={handleDeleteItem("milestones")}
                 onAdd={handleAddItem}
                 onDuplicate={handleDuplicateItem}
+                onReorder={handleReorderItem}
               />
               <DroppableGroup
                 groupId="risks"
@@ -1218,6 +1394,7 @@ export default function SprintPlanner() {
                 onDelete={handleDeleteItem("risks")}
                 onAdd={handleAddItem}
                 onDuplicate={handleDuplicateItem}
+                onReorder={handleReorderItem}
               />
               <DroppableGroup
                 groupId="dependencies"
@@ -1226,6 +1403,7 @@ export default function SprintPlanner() {
                 onDelete={handleDeleteItem("dependencies")}
                 onAdd={handleAddItem}
                 onDuplicate={handleDuplicateItem}
+                onReorder={handleReorderItem}
               />
               <DroppableGroup
                 groupId="willNotDo"
@@ -1234,6 +1412,7 @@ export default function SprintPlanner() {
                 onDelete={handleDeleteItem("willNotDo")}
                 onAdd={handleAddItem}
                 onDuplicate={handleDuplicateItem}
+                onReorder={handleReorderItem}
                 stats={calcStats("willNotDo")}
               />
               <DroppableGroup
@@ -1243,6 +1422,7 @@ export default function SprintPlanner() {
                 onDelete={handleDeleteItem("uncommitted")}
                 onAdd={handleAddItem}
                 onDuplicate={handleDuplicateItem}
+                onReorder={handleReorderItem}
                 stats={calcStats("uncommitted")}
               />
             </div>
