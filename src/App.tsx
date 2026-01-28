@@ -16,6 +16,8 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import ImportExportModal from "./ImportExportModal";
+import KeyboardShortcuts from "./components/KeyboardShortcuts";
 
 // ============ TYPES ============
 interface SubItem {
@@ -406,22 +408,22 @@ function DraggableItem({
 
   if (isEditing) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-3 mb-2">
+      <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-2 mb-1">
         <input
           type="text"
           value={editData.text}
           onChange={(e) => setEditData({ ...editData, text: e.target.value })}
           placeholder="Main text..."
-          className="w-full px-2 py-1 border border-slate-300 rounded mb-2 text-sm"
+          className="w-full px-1.5 py-1 border border-slate-300 rounded mb-1.5 text-sm"
           autoFocus
         />
-        <div className="grid grid-cols-2 gap-2 mb-2">
+        <div className="grid grid-cols-2 gap-1.5 mb-1.5">
           <input
             type="text"
             value={editData.epic || ""}
             onChange={(e) => setEditData({ ...editData, epic: e.target.value })}
             placeholder="Epic (XX-0000)"
-            className="px-2 py-1 border border-slate-300 rounded text-sm"
+            className="px-1.5 py-1 border border-slate-300 rounded text-sm"
           />
           <input
             type="text"
@@ -430,7 +432,7 @@ function DraggableItem({
               setEditData({ ...editData, domain: e.target.value })
             }
             placeholder="Domain"
-            className="px-2 py-1 border border-slate-300 rounded text-sm"
+            className="px-1.5 py-1 border border-slate-300 rounded text-sm"
           />
           <input
             type="number"
@@ -442,7 +444,7 @@ function DraggableItem({
               })
             }
             placeholder="Req pts"
-            className="px-2 py-1 border border-slate-300 rounded text-sm"
+            className="px-1.5 py-1 border border-slate-300 rounded text-sm"
           />
           <input
             type="number"
@@ -454,10 +456,10 @@ function DraggableItem({
               })
             }
             placeholder="Opt pts"
-            className="px-2 py-1 border border-slate-300 rounded text-sm"
+            className="px-1.5 py-1 border border-slate-300 rounded text-sm"
           />
         </div>
-        <div className="mb-2">
+        <div className="mb-1.5">
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs text-slate-500">Sub-items</span>
             <button
@@ -474,21 +476,21 @@ function DraggableItem({
                 value={sub.text}
                 onChange={(e) => updateSubItem(sub.id, e.target.value)}
                 placeholder="Sub-item text..."
-                className="flex-1 px-2 py-1 border border-slate-300 rounded text-sm"
+                className="flex-1 px-1.5 py-1 border border-slate-300 rounded text-sm"
               />
               <button
                 onClick={() => removeSubItem(sub.id)}
-                className="text-red-500 hover:text-red-700 px-2"
+                className="text-red-500 hover:text-red-700 px-1.5"
               >
                 ×
               </button>
             </div>
           ))}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-1.5">
           <button
             onClick={handleSave}
-            className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+            className="px-2 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
           >
             Save
           </button>
@@ -497,13 +499,13 @@ function DraggableItem({
               setEditData(item);
               setIsEditing(false);
             }}
-            className="px-3 py-1 bg-slate-200 rounded text-sm hover:bg-slate-300"
+            className="px-2 py-1 bg-slate-200 rounded text-sm hover:bg-slate-300"
           >
             Cancel
           </button>
           <button
             onClick={() => onDelete(item.id)}
-            className="px-3 py-1 bg-red-100 text-red-600 rounded text-sm hover:bg-red-200 ml-auto"
+            className="px-2 py-1 bg-red-100 text-red-600 rounded text-sm hover:bg-red-200 ml-auto"
           >
             Delete
           </button>
@@ -516,7 +518,7 @@ function DraggableItem({
     <div
       ref={setNodeRef}
       style={style}
-      className="bg-white rounded-lg shadow-sm border border-slate-200 mb-1.5 group relative"
+      className="bg-white rounded-lg shadow-sm border border-slate-200 mb-1 group relative"
     >
       <div className="flex items-start px-1.5 py-1">
         <div
@@ -531,7 +533,7 @@ function DraggableItem({
               onReorder(item.id, "down");
             }
           }}
-          className="cursor-grab active:cursor-grabbing p-0.5 mr-1 text-slate-400 hover:text-slate-600 flex-shrink-0 focus:text-blue-500 focus:outline-none"
+          className="cursor-grab active:cursor-grabbing p-0.5 mr-1 text-slate-400 hover:text-slate-600 flex-shrink-0 focus:text-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-300 focus:bg-blue-50 rounded"
         >
           <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
             <circle cx="5" cy="5" r="2" />
@@ -560,7 +562,11 @@ function DraggableItem({
               </a>
             )}
             {item.domain && (
-              <span className="text-[10px] bg-purple-100 text-purple-700 px-1 py-0.5 rounded leading-none">
+              <span className="text-[10px] bg-slate-100 text-slate-600 px-1 py-0.5 rounded leading-none flex items-center gap-1">
+                <span
+                  className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: getDomainColor(item.domain) }}
+                />
                 {item.domain}
               </span>
             )}
@@ -744,7 +750,7 @@ function DroppableGroup({
   return (
     <div className="flex flex-col h-full">
       <div
-        className="rounded-t-lg px-3 py-2"
+        className="rounded-t-lg px-2 py-1.5"
         style={{ backgroundColor: config.bgColor }}
       >
         <div className="flex items-center justify-between">
@@ -776,7 +782,7 @@ function DroppableGroup({
       </div>
       <div
         ref={setNodeRef}
-        className={`flex-1 bg-slate-50 p-2 rounded-b-lg border-2 border-t-0 transition-colors overflow-y-auto ${
+        className={`flex-1 bg-slate-50 p-1.5 rounded-b-lg border-2 border-t-0 transition-colors overflow-y-auto ${
           isOver ? "border-blue-400 bg-blue-50" : "border-slate-200"
         }`}
         style={{ minHeight: "120px" }}
@@ -799,7 +805,7 @@ function DroppableGroup({
         </SortableContext>
         <button
           onClick={() => onAdd(groupId)}
-          className="w-full py-2 text-sm text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded border border-dashed border-slate-300 transition-colors"
+          className="w-full py-1.5 text-sm text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded border border-dashed border-slate-300 transition-colors"
         >
           + Add Item
         </button>
@@ -815,21 +821,92 @@ interface DomainStat {
   percent: number;
 }
 
-const DOMAIN_COLORS: Record<string, string> = {
-  Incentives: "#3b82f6",
-  Margins: "#10b981",
-  Budgets: "#f59e0b",
-  Audiences: "#8b5cf6",
-  Signal: "#ec4899",
-  Unassigned: "#94a3b8",
+// ROYGBIV color palette for domains
+const ROYGBIV_COLORS = [
+  "#ef4444", // Red
+  "#f97316", // Orange
+  "#eab308", // Yellow
+  "#22c55e", // Green
+  "#3b82f6", // Blue
+  "#6366f1", // Indigo
+  "#8b5cf6", // Violet
+  "#ec4899", // Pink (extended)
+  "#14b8a6", // Teal (extended)
+  "#f59e0b", // Amber (extended)
+];
+
+const DOMAIN_COLORS_STORAGE_KEY = "sprint-planner-domain-colors";
+
+const loadDomainColors = (): Record<string, string> => {
+  try {
+    const saved = localStorage.getItem(DOMAIN_COLORS_STORAGE_KEY);
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch (e) {
+    console.error("Failed to load domain colors:", e);
+  }
+  return { Unassigned: "#94a3b8" };
 };
 
+const saveDomainColors = (colors: Record<string, string>): void => {
+  try {
+    localStorage.setItem(DOMAIN_COLORS_STORAGE_KEY, JSON.stringify(colors));
+  } catch (e) {
+    console.error("Failed to save domain colors:", e);
+  }
+};
+
+// Get next available color from ROYGBIV palette
+const getNextColor = (existingColors: Record<string, string>): string => {
+  const usedColors = new Set(Object.values(existingColors));
+  for (const color of ROYGBIV_COLORS) {
+    if (!usedColors.has(color)) {
+      return color;
+    }
+  }
+  // If all colors used, cycle through with slight variation
+  const index = Object.keys(existingColors).length % ROYGBIV_COLORS.length;
+  return ROYGBIV_COLORS[index];
+};
+
+// Singleton for domain colors (loaded once, updated as needed)
+let domainColorsCache: Record<string, string> = loadDomainColors();
+
 function getDomainColor(domain: string): string {
-  return (
-    DOMAIN_COLORS[domain] ||
-    `hsl(${Math.abs(domain.split("").reduce((a, c) => a + c.charCodeAt(0), 0)) % 360}, 60%, 50%)`
-  );
+  if (domainColorsCache[domain]) {
+    return domainColorsCache[domain];
+  }
+  // Assign new color for unknown domain
+  const newColor = getNextColor(domainColorsCache);
+  domainColorsCache[domain] = newColor;
+  saveDomainColors(domainColorsCache);
+  return newColor;
 }
+
+// Function to sync domain colors with current data
+const syncDomainColors = (data: PlannerData): void => {
+  const allDomains = new Set<string>();
+  Object.values(data.items).forEach((items) => {
+    items.forEach((item) => {
+      if (item.domain) {
+        allDomains.add(item.domain);
+      }
+    });
+  });
+  
+  let updated = false;
+  allDomains.forEach((domain) => {
+    if (!domainColorsCache[domain]) {
+      domainColorsCache[domain] = getNextColor(domainColorsCache);
+      updated = true;
+    }
+  });
+  
+  if (updated) {
+    saveDomainColors(domainColorsCache);
+  }
+};
 
 interface CommittedStatsPanelProps {
   committedPercent: number;
@@ -845,7 +922,7 @@ function CommittedStatsPanel({
   committedPoints,
 }: CommittedStatsPanelProps) {
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-2 mb-2">
+    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-2 mb-1.5">
       {/* Committed Progress Bar */}
       <div className={domainStats.length > 0 ? "mb-1.5" : ""}>
         <div className="flex items-center justify-between mb-0.5">
@@ -891,7 +968,7 @@ function CommittedStatsPanel({
                 key={d.name}
                 className="h-full transition-all"
                 style={{
-                  width: `${d.percent}%`,
+                  flexGrow: d.points,
                   backgroundColor: getDomainColor(d.name),
                 }}
                 title={`${d.name}: ${d.points}p (${d.percent}%)`}
@@ -981,25 +1058,25 @@ function SprintTable({
   );
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-2 mb-2">
+    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-2 mb-1.5">
       <div
         className="flex items-center justify-between cursor-pointer hover:bg-slate-50 -m-2 p-2 rounded-lg transition-colors"
         onClick={toggleCollapse}
       >
         <div className="flex items-center gap-1.5">
           <div
-            className={`w-5 h-5 rounded flex items-center justify-center bg-slate-100 hover:bg-slate-200 transition-colors ${isCollapsed ? "" : "bg-slate-200"}`}
+            className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${isCollapsed ? "bg-slate-100 hover:bg-slate-200" : "bg-slate-200"}`}
           >
             <svg
-              className={`w-3 h-3 text-slate-600 transition-transform ${isCollapsed ? "" : "rotate-90"}`}
-              fill="currentColor"
-              viewBox="0 0 20 20"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              className={`text-slate-600 transition-transform ${isCollapsed ? "" : "rotate-180"}`}
             >
-              <path
-                fillRule="evenodd"
-                d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                clipRule="evenodd"
-              />
+              <polyline points="6 9 12 15 18 9" />
             </svg>
           </div>
           <span className="font-medium text-slate-700 text-xs">Velocity</span>
@@ -1080,9 +1157,15 @@ function SprintTable({
 
 // ============ MAIN APP ============
 export default function SprintPlanner() {
-  const [data, setData] = useState<PlannerData>(loadFromStorage);
+  const [data, setData] = useState<PlannerData>(() => {
+    const loaded = loadFromStorage();
+    // Sync domain colors with loaded data
+    syncDomainColors(loaded);
+    return loaded;
+  });
   const [_activeId, setActiveId] = useState<string | null>(null);
   const [activeItem, setActiveItem] = useState<DragData | null>(null);
+  const [showImportExport, setShowImportExport] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -1091,6 +1174,8 @@ export default function SprintPlanner() {
   // Save to storage whenever data changes
   useEffect(() => {
     saveToStorage(data);
+    // Also sync domain colors when data changes
+    syncDomainColors(data);
   }, [data]);
 
   // Calculate statistics
@@ -1294,6 +1379,21 @@ export default function SprintPlanner() {
     });
   };
 
+  const handleImportData = (jsonString: string): void => {
+    try {
+      const imported = JSON.parse(jsonString) as Partial<PlannerData>;
+      const newData: PlannerData = {
+        ...DEFAULT_DATA,
+        ...imported,
+        items: { ...DEFAULT_DATA.items, ...imported.items },
+      };
+      setData(newData);
+      syncDomainColors(newData);
+    } catch (e) {
+      console.error("Failed to import data:", e);
+    }
+  };
+
   const handleUpdateItem =
     (groupId: GroupId) =>
     (itemId: string, updates: Partial<Item>): void => {
@@ -1321,7 +1421,7 @@ export default function SprintPlanner() {
     };
 
   return (
-    <div className="min-h-screen bg-slate-800 p-4">
+    <div className="min-h-screen bg-slate-800 p-2">
       <div className="max-w-[1800px] mx-auto">
         <DndContext
           sensors={sensors}
@@ -1329,7 +1429,7 @@ export default function SprintPlanner() {
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          <div className="flex gap-4 h-[calc(100vh-32px)]">
+          <div className="flex gap-2 h-[calc(100vh-16px)]">
             {/* Left Sidebar: Stats + Sprint Table + Staging */}
             <div className="w-64 flex-shrink-0 flex flex-col">
               <CommittedStatsPanel
@@ -1348,6 +1448,7 @@ export default function SprintPlanner() {
                   setData((prev) => ({ ...prev, velocity }))
                 }
               />
+              <KeyboardShortcuts />
               <div className="flex-1 min-h-0">
                 <DroppableGroup
                   groupId="staging"
@@ -1360,10 +1461,22 @@ export default function SprintPlanner() {
                   stats={calcStats("staging")}
                 />
               </div>
+              {/* Import/Export Button */}
+              <button
+                onClick={() => setShowImportExport(true)}
+                className="mt-1.5 w-full py-1 text-xs text-slate-400 hover:text-slate-600 hover:bg-white/50 rounded transition-colors flex items-center justify-center gap-1"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                Import / Export
+              </button>
             </div>
 
             {/* Main Content Grid */}
-            <div className="flex-1 grid grid-cols-3 grid-rows-2 gap-3 min-h-0">
+            <div className="flex-1 grid grid-cols-3 grid-rows-2 gap-2 min-h-0">
               <DroppableGroup
                 groupId="committed"
                 items={data.items.committed}
@@ -1430,7 +1543,7 @@ export default function SprintPlanner() {
 
           <DragOverlay>
             {activeItem && (
-              <div className="bg-white rounded-lg shadow-lg border-2 border-blue-400 p-2 opacity-90">
+              <div className="bg-white rounded-lg shadow-lg border-2 border-blue-400 p-1.5 opacity-90">
                 <div className="text-sm font-medium">
                   {activeItem.item.text || "Untitled"}
                 </div>
@@ -1439,6 +1552,14 @@ export default function SprintPlanner() {
           </DragOverlay>
         </DndContext>
       </div>
+
+      {/* Import/Export Modal */}
+      <ImportExportModal
+        isOpen={showImportExport}
+        onClose={() => setShowImportExport(false)}
+        currentData={JSON.stringify(data, null, 2)}
+        onImport={handleImportData}
+      />
     </div>
   );
 }
