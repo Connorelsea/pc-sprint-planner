@@ -92,6 +92,8 @@ interface DraggableItemProps {
   onDelete: (itemId: string) => void;
   onDuplicate: (item: Item) => void;
   onReorder: (itemId: string, direction: "up" | "down") => void;
+  hoveredEpic: string | null;
+  onEpicHover: (epic: string | null) => void;
 }
 
 interface DroppableGroupProps {
@@ -107,6 +109,8 @@ interface DroppableGroupProps {
     direction: "up" | "down",
   ) => void;
   stats?: Stats;
+  hoveredEpic: string | null;
+  onEpicHover: (epic: string | null) => void;
 }
 
 interface SprintTableProps {
@@ -185,6 +189,8 @@ function DraggableItem({
   onDelete,
   onDuplicate,
   onReorder,
+  hoveredEpic,
+  onEpicHover,
 }: DraggableItemProps) {
   const {
     attributes,
@@ -534,11 +540,18 @@ function DraggableItem({
     );
   }
 
+  const isEpicHighlighted =
+    hoveredEpic && item.epic && item.epic === hoveredEpic;
+
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 mb-1 group relative"
+      className={`rounded-lg shadow-sm mb-1 group relative transition-colors border ${
+        isEpicHighlighted
+          ? "bg-slate-100 dark:bg-slate-700 border-slate-400 dark:border-slate-500"
+          : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+      }`}
     >
       <div className="flex items-start px-1.5 py-1">
         <div
@@ -586,7 +599,13 @@ function DraggableItem({
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="text-[10px] font-mono bg-blue-50 dark:bg-blue-900/60 text-blue-600 dark:text-blue-300 px-1 py-0.5 rounded leading-none underline hover:bg-blue-100 dark:hover:bg-blue-900/80 transition-colors border border-blue-200 dark:border-blue-700"
+                    onMouseEnter={() => onEpicHover(item.epic!)}
+                    onMouseLeave={() => onEpicHover(null)}
+                    className={`text-[10px] font-mono px-1 py-0.5 rounded leading-none underline transition-colors border ${
+                      isEpicHighlighted
+                        ? "bg-blue-100 dark:bg-blue-800/80 text-blue-700 dark:text-blue-200 border-blue-300 dark:border-blue-600 font-bold"
+                        : "bg-blue-50 dark:bg-blue-900/60 text-blue-600 dark:text-blue-300 border-blue-200 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/80"
+                    }`}
                     style={{ boxShadow: "0 1px 2px rgba(59, 130, 246, 0.15)" }}
                   >
                     {item.epic}
@@ -848,6 +867,8 @@ function DroppableGroup({
   onDuplicate,
   onReorder,
   stats,
+  hoveredEpic,
+  onEpicHover,
 }: DroppableGroupProps) {
   const config = GROUP_CONFIG[groupId];
   const { setNodeRef, isOver } = useDroppable({ id: groupId });
@@ -965,6 +986,8 @@ function DroppableGroup({
               onDelete={onDelete}
               onDuplicate={(i) => onDuplicate(groupId, i)}
               onReorder={(itemId, dir) => onReorder(groupId, itemId, dir)}
+              hoveredEpic={hoveredEpic}
+              onEpicHover={onEpicHover}
             />
           ))}
         </SortableContext>
@@ -1341,6 +1364,7 @@ export default function SprintPlanner() {
   const [_activeId, setActiveId] = useState<string | null>(null);
   const [activeItem, setActiveItem] = useState<DragData | null>(null);
   const [showImportExport, setShowImportExport] = useState(false);
+  const [hoveredEpic, setHoveredEpic] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     try {
       const saved = localStorage.getItem("sprint-planner-dark-mode");
@@ -1670,6 +1694,8 @@ export default function SprintPlanner() {
                   onDuplicate={handleDuplicateItem}
                   onReorder={handleReorderItem}
                   stats={calcStats("staging")}
+                  hoveredEpic={hoveredEpic}
+                  onEpicHover={setHoveredEpic}
                 />
               </div>
               {/* Bottom buttons */}
@@ -1749,6 +1775,8 @@ export default function SprintPlanner() {
                   percent: committedPercent,
                   remaining: committedRemaining,
                 }}
+                hoveredEpic={hoveredEpic}
+                onEpicHover={setHoveredEpic}
               />
               <DroppableGroup
                 groupId="milestones"
@@ -1758,6 +1786,8 @@ export default function SprintPlanner() {
                 onAdd={handleAddItem}
                 onDuplicate={handleDuplicateItem}
                 onReorder={handleReorderItem}
+                hoveredEpic={hoveredEpic}
+                onEpicHover={setHoveredEpic}
               />
               <DroppableGroup
                 groupId="risks"
@@ -1767,6 +1797,8 @@ export default function SprintPlanner() {
                 onAdd={handleAddItem}
                 onDuplicate={handleDuplicateItem}
                 onReorder={handleReorderItem}
+                hoveredEpic={hoveredEpic}
+                onEpicHover={setHoveredEpic}
               />
               <DroppableGroup
                 groupId="dependencies"
@@ -1776,6 +1808,8 @@ export default function SprintPlanner() {
                 onAdd={handleAddItem}
                 onDuplicate={handleDuplicateItem}
                 onReorder={handleReorderItem}
+                hoveredEpic={hoveredEpic}
+                onEpicHover={setHoveredEpic}
               />
               <DroppableGroup
                 groupId="willNotDo"
@@ -1786,6 +1820,8 @@ export default function SprintPlanner() {
                 onDuplicate={handleDuplicateItem}
                 onReorder={handleReorderItem}
                 stats={calcStats("willNotDo")}
+                hoveredEpic={hoveredEpic}
+                onEpicHover={setHoveredEpic}
               />
               <DroppableGroup
                 groupId="uncommitted"
@@ -1796,6 +1832,8 @@ export default function SprintPlanner() {
                 onDuplicate={handleDuplicateItem}
                 onReorder={handleReorderItem}
                 stats={calcStats("uncommitted")}
+                hoveredEpic={hoveredEpic}
+                onEpicHover={setHoveredEpic}
               />
             </div>
           </div>
