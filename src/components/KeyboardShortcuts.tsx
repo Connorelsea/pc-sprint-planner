@@ -20,13 +20,13 @@ export default function KeyboardShortcuts() {
   const toggleCollapse = () => setIsCollapsed(!isCollapsed);
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-2 mb-1.5">
+    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-2 mb-1.5">
       <div
-        className="flex items-center gap-1.5 cursor-pointer hover:bg-slate-50 -m-2 p-2 rounded-lg transition-colors"
+        className="flex items-center gap-1.5 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 -m-2 p-2 rounded-lg transition-colors"
         onClick={toggleCollapse}
       >
         <div
-          className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${isCollapsed ? "bg-slate-100 hover:bg-slate-200" : "bg-slate-200"}`}
+          className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${isCollapsed ? "bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600" : "bg-slate-200 dark:bg-slate-600"}`}
         >
           <svg
             width="14"
@@ -35,37 +35,45 @@ export default function KeyboardShortcuts() {
             fill="none"
             stroke="currentColor"
             strokeWidth="2.5"
-            className={`text-slate-600 transition-transform ${isCollapsed ? "" : "rotate-180"}`}
+            className={`text-slate-600 dark:text-slate-300 transition-transform ${isCollapsed ? "" : "rotate-180"}`}
           >
             <polyline points="6 9 12 15 18 9" />
           </svg>
         </div>
-        <span className="text-xs font-medium text-slate-700">
+        <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
           Keyboard Shortcuts
         </span>
       </div>
 
       {!isCollapsed && (
-        <div className="mt-2 pt-2 border-t border-slate-100 space-y-2">
+        <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-700 space-y-2">
           {/* Navigation */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-slate-500">Next input/action</span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                Next input/action
+              </span>
               <Kbd>Tab</Kbd>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-slate-500">Previous input/action</span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                Previous input/action
+              </span>
               <KbdGroup>
                 <Kbd>⇧</Kbd>
                 <Kbd>Tab</Kbd>
               </KbdGroup>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-slate-500">Trigger action</span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                Trigger action
+              </span>
               <Kbd>Enter</Kbd>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-slate-500">New sub-item</span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                New sub-item
+              </span>
               <KbdGroup>
                 <Kbd>⇧</Kbd>
                 <Kbd>Enter</Kbd>
@@ -74,14 +82,24 @@ export default function KeyboardShortcuts() {
           </div>
 
           {/* Reordering */}
-          <div className="pt-1.5 border-t border-slate-100 space-y-1.5">
+          <div className="pt-1.5 border-t border-slate-100 dark:border-slate-700 space-y-1.5">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-slate-500">Focus drag handle</span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                Focus drag handle
+              </span>
               <KbdGroup>
                 <Kbd>Tab</Kbd>
-                <span className="text-slate-300 mx-0.5">→</span>
+                <span className="text-slate-300 dark:text-slate-500 mx-0.5">
+                  →
+                </span>
                 <span className="inline-flex items-center justify-center w-4 h-4 rounded ring-1 ring-blue-300 bg-blue-50">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" className="text-blue-500">
+                  <svg
+                    width="10"
+                    height="10"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    className="text-blue-500"
+                  >
                     <circle cx="5" cy="5" r="2" />
                     <circle cx="12" cy="5" r="2" />
                     <circle cx="19" cy="5" r="2" />
@@ -96,7 +114,9 @@ export default function KeyboardShortcuts() {
               </KbdGroup>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-slate-500">Reorder task</span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                Reorder task
+              </span>
               <KbdGroup>
                 <Kbd>↑</Kbd>
                 <Kbd>↓</Kbd>
@@ -105,13 +125,17 @@ export default function KeyboardShortcuts() {
           </div>
 
           {/* Editing */}
-          <div className="pt-1.5 border-t border-slate-100 space-y-1.5">
+          <div className="pt-1.5 border-t border-slate-100 dark:border-slate-700 space-y-1.5">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-slate-500">Delete empty sub-item</span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                Delete empty sub-item
+              </span>
               <Kbd>⌫</Kbd>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-slate-500">Cancel edit</span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                Cancel edit
+              </span>
               <Kbd>Esc</Kbd>
             </div>
           </div>

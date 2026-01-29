@@ -49,15 +49,15 @@ export default function ImportExportModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col m-4">
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col m-4">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-800">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700">
+          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
             Import / Export Data
           </h2>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 p-1"
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1"
           >
             <svg
               width="20"
@@ -78,12 +78,12 @@ export default function ImportExportModal({
           {/* Export Section */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-slate-700">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
                 Export (Current Data)
               </label>
               <button
                 onClick={handleCopy}
-                className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400 rounded hover:bg-blue-200 dark:hover:bg-blue-900/70 transition-colors"
               >
                 {copied ? "Copied!" : "Copy to Clipboard"}
               </button>
@@ -91,13 +91,13 @@ export default function ImportExportModal({
             <textarea
               readOnly
               value={currentData}
-              className="w-full h-32 px-2 py-1.5 text-xs font-mono bg-slate-50 border border-slate-200 rounded resize-none focus:outline-none focus:border-slate-300"
+              className="w-full h-32 px-2 py-1.5 text-xs font-mono bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded resize-none focus:outline-none focus:border-slate-300 dark:focus:border-slate-600 text-slate-800 dark:text-slate-200"
             />
           </div>
 
           {/* Import Section */}
           <div>
-            <label className="text-sm font-medium text-slate-700 block mb-2">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300 block mb-2">
               Import (Paste JSON to overwrite)
             </label>
             <textarea
@@ -107,19 +107,21 @@ export default function ImportExportModal({
                 setError(null);
               }}
               placeholder="Paste JSON data here..."
-              className="w-full h-32 px-2 py-1.5 text-xs font-mono bg-white border border-slate-200 rounded resize-none focus:outline-none focus:border-blue-400"
+              className="w-full h-32 px-2 py-1.5 text-xs font-mono bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded resize-none focus:outline-none focus:border-blue-400 dark:focus:border-blue-500 text-slate-800 dark:text-slate-200"
             />
             {error && (
-              <p className="text-xs text-red-600 mt-1">{error}</p>
+              <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                {error}
+              </p>
             )}
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-slate-200 bg-slate-50">
+        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
           <button
             onClick={onClose}
-            className="px-3 py-1.5 text-sm text-slate-600 hover:text-slate-800 transition-colors"
+            className="px-3 py-1.5 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
           >
             Cancel
           </button>

@@ -18,6 +18,17 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import ImportExportModal from "./ImportExportModal";
 import KeyboardShortcuts from "./components/KeyboardShortcuts";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "./components/ui/alert-dialog";
 
 // ============ TYPES ============
 interface SubItem {
@@ -90,7 +101,11 @@ interface DroppableGroupProps {
   onDelete: (itemId: string) => void;
   onAdd: (groupId: GroupId) => void;
   onDuplicate: (groupId: GroupId, item: Item) => void;
-  onReorder: (groupId: GroupId, itemId: string, direction: "up" | "down") => void;
+  onReorder: (
+    groupId: GroupId,
+    itemId: string,
+    direction: "up" | "down",
+  ) => void;
   stats?: Stats;
 }
 
@@ -289,7 +304,7 @@ function DraggableItem({
       const currentIndex = item.subItems.findIndex((s) => s.id === subId);
       const newSubId = generateId();
       const updatedSubItems = item.subItems.map((s) =>
-        s.id === subId ? { ...s, text: inlineSubText } : s
+        s.id === subId ? { ...s, text: inlineSubText } : s,
       );
       // Insert new sub-item after current one
       updatedSubItems.splice(currentIndex + 1, 0, { id: newSubId, text: "" });
@@ -308,7 +323,7 @@ function DraggableItem({
       const currentIndex = item.subItems.findIndex((s) => s.id === subId);
       // Save current sub-item
       const updatedSubItems = item.subItems.map((s) =>
-        s.id === subId ? { ...s, text: inlineSubText } : s
+        s.id === subId ? { ...s, text: inlineSubText } : s,
       );
       onUpdate(item.id, { subItems: updatedSubItems });
 
@@ -374,7 +389,10 @@ function DraggableItem({
 
   const addInlineSubItem = () => {
     const newSubId = generateId();
-    const updatedSubItems = [...(item.subItems || []), { id: newSubId, text: "" }];
+    const updatedSubItems = [
+      ...(item.subItems || []),
+      { id: newSubId, text: "" },
+    ];
     onUpdate(item.id, { subItems: updatedSubItems });
     // Start editing the new sub-item
     setTimeout(() => {
@@ -408,13 +426,13 @@ function DraggableItem({
 
   if (isEditing) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-2 mb-1">
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-2 mb-1">
         <input
           type="text"
           value={editData.text}
           onChange={(e) => setEditData({ ...editData, text: e.target.value })}
           placeholder="Main text..."
-          className="w-full px-1.5 py-1 border border-slate-300 rounded mb-1.5 text-sm"
+          className="w-full px-1.5 py-1 border border-slate-300 dark:border-slate-600 rounded mb-1.5 text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
           autoFocus
         />
         <div className="grid grid-cols-2 gap-1.5 mb-1.5">
@@ -423,7 +441,7 @@ function DraggableItem({
             value={editData.epic || ""}
             onChange={(e) => setEditData({ ...editData, epic: e.target.value })}
             placeholder="Epic (XX-0000)"
-            className="px-1.5 py-1 border border-slate-300 rounded text-sm"
+            className="px-1.5 py-1 border border-slate-300 dark:border-slate-600 rounded text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
           />
           <input
             type="text"
@@ -432,7 +450,7 @@ function DraggableItem({
               setEditData({ ...editData, domain: e.target.value })
             }
             placeholder="Domain"
-            className="px-1.5 py-1 border border-slate-300 rounded text-sm"
+            className="px-1.5 py-1 border border-slate-300 dark:border-slate-600 rounded text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
           />
           <input
             type="number"
@@ -444,7 +462,7 @@ function DraggableItem({
               })
             }
             placeholder="Req pts"
-            className="px-1.5 py-1 border border-slate-300 rounded text-sm"
+            className="px-1.5 py-1 border border-slate-300 dark:border-slate-600 rounded text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
           />
           <input
             type="number"
@@ -456,12 +474,14 @@ function DraggableItem({
               })
             }
             placeholder="Opt pts"
-            className="px-1.5 py-1 border border-slate-300 rounded text-sm"
+            className="px-1.5 py-1 border border-slate-300 dark:border-slate-600 rounded text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
           />
         </div>
         <div className="mb-1.5">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-slate-500">Sub-items</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              Sub-items
+            </span>
             <button
               onClick={addSubItem}
               className="text-xs text-blue-600 hover:text-blue-800"
@@ -476,7 +496,7 @@ function DraggableItem({
                 value={sub.text}
                 onChange={(e) => updateSubItem(sub.id, e.target.value)}
                 placeholder="Sub-item text..."
-                className="flex-1 px-1.5 py-1 border border-slate-300 rounded text-sm"
+                className="flex-1 px-1.5 py-1 border border-slate-300 dark:border-slate-600 rounded text-sm bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
               />
               <button
                 onClick={() => removeSubItem(sub.id)}
@@ -499,13 +519,13 @@ function DraggableItem({
               setEditData(item);
               setIsEditing(false);
             }}
-            className="px-2 py-1 bg-slate-200 rounded text-sm hover:bg-slate-300"
+            className="px-2 py-1 bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-200 rounded text-sm hover:bg-slate-300 dark:hover:bg-slate-500"
           >
             Cancel
           </button>
           <button
             onClick={() => onDelete(item.id)}
-            className="px-2 py-1 bg-red-100 text-red-600 rounded text-sm hover:bg-red-200 ml-auto"
+            className="px-2 py-1 bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 rounded text-sm hover:bg-red-200 dark:hover:bg-red-900/70 ml-auto"
           >
             Delete
           </button>
@@ -518,7 +538,7 @@ function DraggableItem({
     <div
       ref={setNodeRef}
       style={style}
-      className="bg-white rounded-lg shadow-sm border border-slate-200 mb-1 group relative"
+      className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 mb-1 group relative"
     >
       <div className="flex items-start px-1.5 py-1">
         <div
@@ -533,7 +553,7 @@ function DraggableItem({
               onReorder(item.id, "down");
             }
           }}
-          className="cursor-grab active:cursor-grabbing p-0.5 mr-1 text-slate-400 hover:text-slate-600 flex-shrink-0 focus:text-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-300 focus:bg-blue-50 rounded"
+          className="cursor-grab active:cursor-grabbing p-0.5 mr-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 flex-shrink-0 focus:text-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-300 focus:bg-blue-50 dark:focus:bg-blue-900/50 rounded"
         >
           <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
             <circle cx="5" cy="5" r="2" />
@@ -548,49 +568,104 @@ function DraggableItem({
           </svg>
         </div>
         <div className="flex-1">
-          {/* Single line: pills + text + points, wraps naturally */}
-          <div className="flex items-center gap-1 flex-wrap">
-            {item.epic && (
-              <a
-                href={`https://purecars.atlassian.net/browse/${item.epic}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="text-[10px] font-mono bg-blue-50 text-blue-600 px-1 py-0.5 rounded leading-none underline hover:bg-blue-100 transition-colors"
-              >
-                {item.epic}
-              </a>
-            )}
-            {item.domain && (
-              <span className="text-[10px] bg-slate-100 text-slate-600 px-1 py-0.5 rounded leading-none flex items-center gap-1">
-                <span
-                  className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: getDomainColor(item.domain) }}
-                />
-                {item.domain}
-              </span>
-            )}
-            {(item.requiredPoints || item.optionalPoints) && (() => {
-              const totalPoints =
-                (typeof item.requiredPoints === "number" ? item.requiredPoints : parseInt(item.requiredPoints || "0") || 0) +
-                (typeof item.optionalPoints === "number" ? item.optionalPoints : parseInt(item.optionalPoints || "0") || 0);
-              const pointsColorClass =
-                totalPoints >= 36 ? "bg-red-200 text-red-800" :
-                totalPoints >= 26 ? "bg-red-100 text-red-600" :
-                totalPoints >= 16 ? "bg-orange-100 text-orange-700" :
-                totalPoints >= 11 ? "bg-yellow-100 text-yellow-700" :
-                totalPoints >= 6 ? "bg-green-200 text-green-800" :
-                "bg-green-100 text-green-600";
-              return (
-                <span className={`text-[10px] px-1 py-0.5 rounded leading-none ${pointsColorClass}`}>
-                  {item.requiredPoints ? `${item.requiredPoints}p` : ""}
-                  {item.requiredPoints && item.optionalPoints ? "+" : ""}
-                  {item.optionalPoints ? `${item.optionalPoints}p` : ""}
-                </span>
-              );
-            })()}
-            {/* Inline editable main text */}
-            {isEditingText ? (
+          {/* Pills + text, with conditional layout based on editing state and pill presence */}
+          {(() => {
+            const hasPills = !!(
+              item.epic ||
+              item.domain ||
+              item.requiredPoints ||
+              item.optionalPoints
+            );
+            const shouldBreakLine = isEditingText && hasPills;
+
+            const pillsContent = (
+              <>
+                {item.epic && (
+                  <a
+                    href={`https://purecars.atlassian.net/browse/${item.epic}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-[10px] font-mono bg-blue-50 dark:bg-blue-900/60 text-blue-600 dark:text-blue-300 px-1 py-0.5 rounded leading-none underline hover:bg-blue-100 dark:hover:bg-blue-900/80 transition-colors border border-blue-200 dark:border-blue-700"
+                    style={{ boxShadow: "0 1px 2px rgba(59, 130, 246, 0.15)" }}
+                  >
+                    {item.epic}
+                  </a>
+                )}
+                {item.domain && (
+                  <span
+                    className="text-[10px] bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1 py-0.5 rounded leading-none flex items-center gap-1 border border-slate-200 dark:border-slate-600"
+                    style={{ boxShadow: "0 1px 2px rgba(100, 116, 139, 0.15)" }}
+                  >
+                    <span
+                      className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: getDomainColor(item.domain) }}
+                    />
+                    {item.domain}
+                  </span>
+                )}
+                {(item.requiredPoints || item.optionalPoints) &&
+                  (() => {
+                    const totalPoints =
+                      (typeof item.requiredPoints === "number"
+                        ? item.requiredPoints
+                        : parseInt(item.requiredPoints || "0") || 0) +
+                      (typeof item.optionalPoints === "number"
+                        ? item.optionalPoints
+                        : parseInt(item.optionalPoints || "0") || 0);
+                    const pointsConfig =
+                      totalPoints >= 36
+                        ? {
+                            classes:
+                              "bg-red-200 dark:bg-red-900/70 text-red-800 dark:text-red-300 border border-red-300 dark:border-red-700",
+                            shadow: "rgba(239, 68, 68, 0.2)",
+                          }
+                        : totalPoints >= 26
+                          ? {
+                              classes:
+                                "bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-700",
+                              shadow: "rgba(239, 68, 68, 0.15)",
+                            }
+                          : totalPoints >= 16
+                            ? {
+                                classes:
+                                  "bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-700",
+                                shadow: "rgba(249, 115, 22, 0.15)",
+                              }
+                            : totalPoints >= 11
+                              ? {
+                                  classes:
+                                    "bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-700",
+                                  shadow: "rgba(234, 179, 8, 0.15)",
+                                }
+                              : totalPoints >= 6
+                                ? {
+                                    classes:
+                                      "bg-green-200 dark:bg-green-900/60 text-green-800 dark:text-green-300 border border-green-300 dark:border-green-700",
+                                    shadow: "rgba(34, 197, 94, 0.2)",
+                                  }
+                                : {
+                                    classes:
+                                      "bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-700",
+                                    shadow: "rgba(34, 197, 94, 0.15)",
+                                  };
+                    return (
+                      <span
+                        className={`text-[10px] px-1 py-0.5 rounded leading-none ${pointsConfig.classes}`}
+                        style={{
+                          boxShadow: `0 1px 2px ${pointsConfig.shadow}`,
+                        }}
+                      >
+                        {item.requiredPoints ? `${item.requiredPoints}p` : ""}
+                        {item.requiredPoints && item.optionalPoints ? "+" : ""}
+                        {item.optionalPoints ? `${item.optionalPoints}p` : ""}
+                      </span>
+                    );
+                  })()}
+              </>
+            );
+
+            const textContent = isEditingText ? (
               <input
                 type="text"
                 value={inlineText}
@@ -598,25 +673,45 @@ function DraggableItem({
                 onBlur={handleInlineTextSave}
                 onKeyDown={handleInlineTextKeyDown}
                 autoFocus
-                className="flex-1 min-w-[80px] text-xs font-medium text-blue-700 bg-transparent border-0 p-0 focus:outline-none focus:ring-0"
+                className={`text-xs font-medium text-blue-700 dark:text-blue-400 bg-transparent border-0 p-0 focus:outline-none focus:ring-0 ${shouldBreakLine ? "w-full" : "flex-1 min-w-[80px]"}`}
               />
             ) : (
               <span
                 tabIndex={0}
                 onClick={startEditingText}
                 onFocus={startEditingText}
-                className="text-xs font-medium text-slate-800 cursor-text hover:text-slate-600 break-words focus:outline-none"
+                className="text-xs font-medium text-slate-800 dark:text-slate-300 cursor-text hover:text-slate-600 dark:hover:text-slate-400 break-words focus:outline-none"
               >
-                {item.text || <em className="text-slate-400 italic">Enter text...</em>}
+                {item.text || (
+                  <em className="text-slate-400 italic">Enter text...</em>
+                )}
               </span>
-            )}
-          </div>
+            );
+
+            return shouldBreakLine ? (
+              <div>
+                <div className="flex items-center gap-1 flex-wrap mb-0.5">
+                  {pillsContent}
+                </div>
+                {textContent}
+              </div>
+            ) : (
+              <div className="flex items-center gap-1 flex-wrap">
+                {pillsContent}
+                {textContent}
+              </div>
+            );
+          })()}
           {/* Inline editable sub-items */}
           {item.subItems && item.subItems.length > 0 && (
-            <ul className="mt-0.5 ml-2 text-[11px] text-slate-600">
+            <ul className="mt-0.5 ml-2 text-[11px] text-slate-600 dark:text-slate-400">
               {item.subItems.map((sub) => (
                 <li key={sub.id} className="flex items-center">
-                  <span className={`mr-1 transition-colors ${editingSubId === sub.id ? "text-blue-500" : "text-slate-400"}`}>•</span>
+                  <span
+                    className={`mr-1 transition-colors ${editingSubId === sub.id ? "text-blue-500" : "text-slate-400"}`}
+                  >
+                    •
+                  </span>
                   {editingSubId === sub.id ? (
                     <input
                       type="text"
@@ -625,14 +720,14 @@ function DraggableItem({
                       onBlur={() => handleSubItemSave(sub.id)}
                       onKeyDown={(e) => handleSubItemKeyDown(e, sub.id)}
                       autoFocus
-                      className="flex-1 bg-transparent border-0 p-0 focus:outline-none focus:ring-0 text-[11px] text-blue-700"
+                      className="flex-1 bg-transparent border-0 p-0 focus:outline-none focus:ring-0 text-[11px] text-blue-700 dark:text-blue-400"
                     />
                   ) : (
                     <span
                       tabIndex={0}
                       onClick={() => handleSubItemClick(sub.id, sub.text)}
                       onFocus={() => handleSubItemClick(sub.id, sub.text)}
-                      className="cursor-text hover:text-slate-800 focus:outline-none"
+                      className="cursor-text hover:text-slate-800 dark:hover:text-slate-200 focus:outline-none"
                     >
                       {sub.text || <em className="text-slate-400">empty</em>}
                     </span>
@@ -644,14 +739,21 @@ function DraggableItem({
         </div>
       </div>
       {/* Action buttons - absolutely positioned */}
-      <div className="absolute -top-2 right-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 flex items-center gap-0.5 bg-white rounded shadow-sm border border-slate-200 px-0.5 transition-opacity">
+      <div className="absolute -top-2 right-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 flex items-center gap-0.5 bg-white dark:bg-slate-700 rounded shadow-sm border border-slate-200 dark:border-slate-600 px-0.5 transition-opacity">
         {/* Add sub-item button */}
         <button
           onClick={addInlineSubItem}
-          className="p-0.5 text-slate-400 hover:text-blue-600"
+          className="p-0.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400"
           title="Add sub-item"
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <polyline points="9 10 4 15 9 20" />
             <path d="M20 4v7a4 4 0 0 1-4 4H4" />
           </svg>
@@ -659,10 +761,17 @@ function DraggableItem({
         {/* Duplicate button */}
         <button
           onClick={() => onDuplicate(item)}
-          className="p-0.5 text-slate-400 hover:text-green-600"
+          className="p-0.5 text-slate-400 hover:text-green-600 dark:hover:text-green-400"
           title="Duplicate"
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
             <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
           </svg>
@@ -673,14 +782,57 @@ function DraggableItem({
             setEditData(item);
             setIsEditing(true);
           }}
-          className="p-0.5 text-slate-400 hover:text-slate-600"
+          className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
           title="Edit"
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
           </svg>
         </button>
+        {/* Delete button with confirmation */}
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <button
+              className="p-0.5 text-slate-400 hover:text-red-600 dark:hover:text-red-400"
+              title="Delete"
+            >
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+            </button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete this item?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete "
+                {item.text || "this item"}" and all its sub-items.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => onDelete(item.id)}>
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
@@ -706,7 +858,7 @@ function DroppableGroup({
       .map((item, idx) => {
         const num = idx + 1;
         const parts: string[] = [];
-        
+
         // Build the main line: "1. [Domain] - Title (EPIC)"
         let mainLine = `${num}.`;
         if (item.domain) {
@@ -719,7 +871,7 @@ function DroppableGroup({
           mainLine += ` (${item.epic})`;
         }
         parts.push(mainLine);
-        
+
         // Add sub-items with tab indent and letter prefix
         if (item.subItems && item.subItems.length > 0) {
           item.subItems.forEach((sub, subIdx) => {
@@ -729,7 +881,7 @@ function DroppableGroup({
             }
           });
         }
-        
+
         return parts.join("\n");
       })
       .filter(Boolean)
@@ -751,7 +903,11 @@ function DroppableGroup({
     <div className="flex flex-col h-full">
       <div
         className="rounded-t-lg px-2 py-1.5"
-        style={{ backgroundColor: config.bgColor }}
+        style={{
+          backgroundColor: config.bgColor,
+          boxShadow:
+            "inset 0 1px 0 0 rgba(255,255,255,0.1), inset 0 -1px 0 0 rgba(0,0,0,0.15)",
+        }}
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
@@ -762,7 +918,14 @@ function DroppableGroup({
                 className="p-0.5 text-white/60 hover:text-white transition-colors"
                 title="Copy to clipboard"
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
                   <polyline points="16 6 12 2 8 6" />
                   <line x1="12" y1="2" x2="12" y2="15" />
@@ -782,8 +945,10 @@ function DroppableGroup({
       </div>
       <div
         ref={setNodeRef}
-        className={`flex-1 bg-slate-50 p-1.5 rounded-b-lg border-2 border-t-0 transition-colors overflow-y-auto ${
-          isOver ? "border-blue-400 bg-blue-50" : "border-slate-200"
+        className={`flex-1 bg-slate-50 dark:bg-slate-900 p-1.5 rounded-b-lg border-2 border-t-0 transition-colors overflow-y-auto ${
+          isOver
+            ? "border-blue-400 bg-blue-50 dark:bg-blue-900/30"
+            : "border-slate-200 dark:border-slate-700"
         }`}
         style={{ minHeight: "120px" }}
       >
@@ -805,7 +970,7 @@ function DroppableGroup({
         </SortableContext>
         <button
           onClick={() => onAdd(groupId)}
-          className="w-full py-1.5 text-sm text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded border border-dashed border-slate-300 transition-colors"
+          className="w-full py-1.5 text-sm text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded border border-dashed border-slate-300 dark:border-slate-600 transition-colors"
         >
           + Add Item
         </button>
@@ -894,7 +1059,7 @@ const syncDomainColors = (data: PlannerData): void => {
       }
     });
   });
-  
+
   let updated = false;
   allDomains.forEach((domain) => {
     if (!domainColorsCache[domain]) {
@@ -902,7 +1067,7 @@ const syncDomainColors = (data: PlannerData): void => {
       updated = true;
     }
   });
-  
+
   if (updated) {
     saveDomainColors(domainColorsCache);
   }
@@ -922,17 +1087,19 @@ function CommittedStatsPanel({
   committedPoints,
 }: CommittedStatsPanelProps) {
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-2 mb-1.5">
+    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-2 mb-1.5">
       {/* Committed Progress Bar */}
       <div className={domainStats.length > 0 ? "mb-1.5" : ""}>
         <div className="flex items-center justify-between mb-0.5">
-          <span className="text-xs font-medium text-slate-600">Committed</span>
-          <span className="text-[11px] text-slate-500">
+          <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+            Committed
+          </span>
+          <span className="text-[11px] text-slate-500 dark:text-slate-400">
             {committedPoints}p / {Math.round(totalPoints)}p
           </span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="flex-1 h-2.5 bg-slate-200 rounded-full overflow-hidden">
+          <div className="flex-1 h-2.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all ${
                 committedPercent > 100
@@ -962,7 +1129,7 @@ function CommittedStatsPanel({
       {domainStats.length > 0 && (
         <div>
           {/* Stacked bar */}
-          <div className="h-2.5 bg-slate-100 rounded overflow-hidden flex mb-1">
+          <div className="h-2.5 bg-slate-100 dark:bg-slate-700 rounded overflow-hidden flex mb-1">
             {domainStats.map((d) => (
               <div
                 key={d.name}
@@ -983,9 +1150,13 @@ function CommittedStatsPanel({
                   className="w-2 h-2 rounded-sm mr-1 flex-shrink-0"
                   style={{ backgroundColor: getDomainColor(d.name) }}
                 />
-                <span className="flex-1 text-slate-600 truncate">{d.name}</span>
-                <span className="text-slate-500 ml-1 tabular-nums">{d.points}p</span>
-                <span className="text-slate-400 ml-0.5 w-7 text-right tabular-nums">
+                <span className="flex-1 text-slate-600 dark:text-slate-300 truncate">
+                  {d.name}
+                </span>
+                <span className="text-slate-500 dark:text-slate-400 ml-1 tabular-nums">
+                  {d.points}p
+                </span>
+                <span className="text-slate-400 dark:text-slate-500 ml-0.5 w-7 text-right tabular-nums">
                   {d.percent}%
                 </span>
               </div>
@@ -1058,14 +1229,14 @@ function SprintTable({
   );
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-2 mb-1.5">
+    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-2 mb-1.5">
       <div
-        className="flex items-center justify-between cursor-pointer hover:bg-slate-50 -m-2 p-2 rounded-lg transition-colors"
+        className="flex items-center justify-between cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 -m-2 p-2 rounded-lg transition-colors"
         onClick={toggleCollapse}
       >
         <div className="flex items-center gap-1.5">
           <div
-            className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${isCollapsed ? "bg-slate-100 hover:bg-slate-200" : "bg-slate-200"}`}
+            className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${isCollapsed ? "bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600" : "bg-slate-200 dark:bg-slate-600"}`}
           >
             <svg
               width="14"
@@ -1074,12 +1245,14 @@ function SprintTable({
               fill="none"
               stroke="currentColor"
               strokeWidth="2.5"
-              className={`text-slate-600 transition-transform ${isCollapsed ? "" : "rotate-180"}`}
+              className={`text-slate-600 dark:text-slate-300 transition-transform ${isCollapsed ? "" : "rotate-180"}`}
             >
               <polyline points="6 9 12 15 18 9" />
             </svg>
           </div>
-          <span className="font-medium text-slate-700 text-xs">Velocity</span>
+          <span className="font-medium text-slate-700 dark:text-slate-300 text-xs">
+            Velocity
+          </span>
         </div>
         <div
           className="flex items-center gap-1.5"
@@ -1089,9 +1262,9 @@ function SprintTable({
             type="number"
             value={velocity}
             onChange={(e) => onVelocityChange(parseInt(e.target.value) || 0)}
-            className="w-10 px-1 py-0.5 border border-slate-300 rounded text-center text-[11px]"
+            className="w-10 px-1 py-0.5 border border-slate-300 dark:border-slate-600 rounded text-center text-[11px] bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100"
           />
-          <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">
+          <span className="text-[11px] font-semibold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/50 px-1.5 py-0.5 rounded">
             {totalPoints.toFixed(0)}p
           </span>
         </div>
@@ -1104,7 +1277,7 @@ function SprintTable({
               return (
                 <div
                   key={sprint.id}
-                  className="flex items-center gap-1 text-[11px] bg-slate-50 rounded px-1.5 py-0.5"
+                  className="flex items-center gap-1 text-[11px] bg-slate-50 dark:bg-slate-700 rounded px-1.5 py-0.5"
                 >
                   <input
                     type="text"
@@ -1112,7 +1285,7 @@ function SprintTable({
                     onChange={(e) =>
                       updateSprint(sprint.id, "name", e.target.value)
                     }
-                    className="w-8 px-0.5 py-0.5 border border-slate-200 rounded text-[11px] text-center"
+                    className="w-8 px-0.5 py-0.5 border border-slate-200 dark:border-slate-600 rounded text-[11px] text-center bg-white dark:bg-slate-600 text-slate-900 dark:text-slate-100"
                   />
                   <input
                     type="number"
@@ -1124,13 +1297,15 @@ function SprintTable({
                         parseFloat(e.target.value) || 0,
                       )
                     }
-                    className="w-12 px-1 py-0.5 border border-slate-200 rounded text-center text-[11px]"
+                    className="w-12 px-1 py-0.5 border border-slate-200 dark:border-slate-600 rounded text-center text-[11px] bg-white dark:bg-slate-600 text-slate-900 dark:text-slate-100"
                     min="0"
                     max="100"
                     step="5"
                   />
-                  <span className="text-slate-400 text-[10px]">%</span>
-                  <span className="flex-1 text-right font-medium text-slate-600">
+                  <span className="text-slate-400 dark:text-slate-500 text-[10px]">
+                    %
+                  </span>
+                  <span className="flex-1 text-right font-medium text-slate-600 dark:text-slate-300">
                     {adjusted.toFixed(0)}p
                   </span>
                   <button
@@ -1145,7 +1320,7 @@ function SprintTable({
           </div>
           <button
             onClick={addSprint}
-            className="mt-1 text-[11px] text-blue-600 hover:text-blue-800"
+            className="mt-1 text-[11px] text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
           >
             + Add Sprint
           </button>
@@ -1166,6 +1341,25 @@ export default function SprintPlanner() {
   const [_activeId, setActiveId] = useState<string | null>(null);
   const [activeItem, setActiveItem] = useState<DragData | null>(null);
   const [showImportExport, setShowImportExport] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    try {
+      const saved = localStorage.getItem("sprint-planner-dark-mode");
+      return saved === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  // Persist dark mode preference
+  useEffect(() => {
+    localStorage.setItem("sprint-planner-dark-mode", String(isDarkMode));
+    // Apply dark class to document for Tailwind dark mode
+    if (isDarkMode) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [isDarkMode]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -1262,7 +1456,7 @@ export default function SprintPlanner() {
 
     // Check if dropping on a group or on another item
     const isOverGroup = Object.keys(GROUP_CONFIG).includes(overId);
-    
+
     if (isOverGroup) {
       // Moving to a different group (drop zone)
       const destGroup = overId as GroupId;
@@ -1273,7 +1467,9 @@ export default function SprintPlanner() {
         ...prev,
         items: {
           ...prev.items,
-          [sourceGroup]: prev.items[sourceGroup].filter((i) => i.id !== item.id),
+          [sourceGroup]: prev.items[sourceGroup].filter(
+            (i) => i.id !== item.id,
+          ),
           [destGroup]: [...prev.items[destGroup], item],
         },
       }));
@@ -1307,13 +1503,19 @@ export default function SprintPlanner() {
           const newIndex = destItems.findIndex((i) => i.id === overId);
 
           const newDestItems = [...destItems];
-          newDestItems.splice(newIndex === -1 ? destItems.length : newIndex, 0, item);
+          newDestItems.splice(
+            newIndex === -1 ? destItems.length : newIndex,
+            0,
+            item,
+          );
 
           return {
             ...prev,
             items: {
               ...prev.items,
-              [sourceGroup]: prev.items[sourceGroup].filter((i) => i.id !== item.id),
+              [sourceGroup]: prev.items[sourceGroup].filter(
+                (i) => i.id !== item.id,
+              ),
               [destGroup]: newDestItems,
             },
           };
@@ -1357,7 +1559,11 @@ export default function SprintPlanner() {
     }));
   };
 
-  const handleReorderItem = (groupId: GroupId, itemId: string, direction: "up" | "down"): void => {
+  const handleReorderItem = (
+    groupId: GroupId,
+    itemId: string,
+    direction: "up" | "down",
+  ): void => {
     setData((prev) => {
       const items = prev.items[groupId];
       const currentIndex = items.findIndex((i) => i.id === itemId);
@@ -1367,7 +1573,10 @@ export default function SprintPlanner() {
       if (newIndex < 0 || newIndex >= items.length) return prev;
 
       const newItems = [...items];
-      [newItems[currentIndex], newItems[newIndex]] = [newItems[newIndex], newItems[currentIndex]];
+      [newItems[currentIndex], newItems[newIndex]] = [
+        newItems[newIndex],
+        newItems[currentIndex],
+      ];
 
       return {
         ...prev,
@@ -1421,7 +1630,9 @@ export default function SprintPlanner() {
     };
 
   return (
-    <div className="min-h-screen bg-slate-800 p-2">
+    <div
+      className={`min-h-screen p-2 transition-colors ${isDarkMode ? "bg-slate-950" : "bg-slate-300"}`}
+    >
       <div className="max-w-[1800px] mx-auto">
         <DndContext
           sensors={sensors}
@@ -1461,18 +1672,66 @@ export default function SprintPlanner() {
                   stats={calcStats("staging")}
                 />
               </div>
-              {/* Import/Export Button */}
-              <button
-                onClick={() => setShowImportExport(true)}
-                className="mt-1.5 w-full py-1 text-xs text-slate-400 hover:text-slate-600 hover:bg-white/50 rounded transition-colors flex items-center justify-center gap-1"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-                Import / Export
-              </button>
+              {/* Bottom buttons */}
+              <div className="mt-1.5 flex gap-1">
+                <button
+                  onClick={() => setShowImportExport(true)}
+                  className="flex-1 py-1 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-white/50 dark:hover:bg-white/10 rounded transition-colors flex items-center justify-center gap-1"
+                >
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  Import / Export
+                </button>
+                <button
+                  onClick={() => setIsDarkMode(!isDarkMode)}
+                  className="px-2 py-1 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-white/50 dark:hover:bg-white/10 rounded transition-colors flex items-center justify-center"
+                  title={
+                    isDarkMode ? "Switch to light mode" : "Switch to dark mode"
+                  }
+                >
+                  {isDarkMode ? (
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <circle cx="12" cy="12" r="5" />
+                      <line x1="12" y1="1" x2="12" y2="3" />
+                      <line x1="12" y1="21" x2="12" y2="23" />
+                      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                      <line x1="1" y1="12" x2="3" y2="12" />
+                      <line x1="21" y1="12" x2="23" y2="12" />
+                      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                    </svg>
+                  ) : (
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
             </div>
 
             {/* Main Content Grid */}
@@ -1543,8 +1802,8 @@ export default function SprintPlanner() {
 
           <DragOverlay>
             {activeItem && (
-              <div className="bg-white rounded-lg shadow-lg border-2 border-blue-400 p-1.5 opacity-90">
-                <div className="text-sm font-medium">
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg border-2 border-blue-400 p-1.5 opacity-90">
+                <div className="text-sm font-medium text-slate-800 dark:text-slate-200">
                   {activeItem.item.text || "Untitled"}
                 </div>
               </div>
