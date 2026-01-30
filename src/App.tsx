@@ -17,6 +17,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import ImportExportModal from "./ImportExportModal";
+import ExportDialog from "./ExportDialog";
 import KeyboardShortcuts from "./components/KeyboardShortcuts";
 import {
   AlertDialog,
@@ -111,6 +112,7 @@ interface DroppableGroupProps {
   stats?: Stats;
   hoveredEpic: string | null;
   onEpicHover: (epic: string | null) => void;
+  onExport: () => void;
 }
 
 interface SprintTableProps {
@@ -869,56 +871,10 @@ function DroppableGroup({
   stats,
   hoveredEpic,
   onEpicHover,
+  onExport,
 }: DroppableGroupProps) {
   const config = GROUP_CONFIG[groupId];
   const { setNodeRef, isOver } = useDroppable({ id: groupId });
-
-  const formatItemsForExport = (): string => {
-    const letters = "abcdefghijklmnopqrstuvwxyz";
-    return items
-      .map((item, idx) => {
-        const num = idx + 1;
-        const parts: string[] = [];
-
-        // Build the main line: "1. [Domain] - Title (EPIC)"
-        let mainLine = `${num}.`;
-        if (item.domain) {
-          mainLine += ` [${item.domain}]`;
-        }
-        if (item.text) {
-          mainLine += item.domain ? ` - ${item.text}` : ` ${item.text}`;
-        }
-        if (item.epic) {
-          mainLine += ` (${item.epic})`;
-        }
-        parts.push(mainLine);
-
-        // Add sub-items with tab indent and letter prefix
-        if (item.subItems && item.subItems.length > 0) {
-          item.subItems.forEach((sub, subIdx) => {
-            if (sub.text) {
-              const letter = letters[subIdx] || String(subIdx + 1);
-              parts.push(`\t${letter}. ${sub.text}`);
-            }
-          });
-        }
-
-        return parts.join("\n");
-      })
-      .filter(Boolean)
-      .join("\n");
-  };
-
-  const handleExport = async () => {
-    const text = formatItemsForExport();
-    if (!text) return;
-    try {
-      await navigator.clipboard.writeText(text);
-      // Brief visual feedback could be added here
-    } catch (err) {
-      console.error("Failed to copy:", err);
-    }
-  };
 
   return (
     <div className="flex flex-col h-full">
@@ -935,9 +891,9 @@ function DroppableGroup({
             <h3 className="font-semibold text-white text-sm">{config.label}</h3>
             {items.length > 0 && (
               <button
-                onClick={handleExport}
+                onClick={onExport}
                 className="p-0.5 text-white/60 hover:text-white transition-colors"
-                title="Copy to clipboard"
+                title="Export items"
               >
                 <svg
                   width="12"
@@ -1365,6 +1321,8 @@ export default function SprintPlanner() {
   const [activeItem, setActiveItem] = useState<DragData | null>(null);
   const [showImportExport, setShowImportExport] = useState(false);
   const [hoveredEpic, setHoveredEpic] = useState<string | null>(null);
+  const [isExpandedMode, setIsExpandedMode] = useState(false);
+  const [exportingGroup, setExportingGroup] = useState<GroupId | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     try {
       const saved = localStorage.getItem("sprint-planner-dark-mode");
@@ -1696,10 +1654,27 @@ export default function SprintPlanner() {
                   stats={calcStats("staging")}
                   hoveredEpic={hoveredEpic}
                   onEpicHover={setHoveredEpic}
+                  onExport={() => setExportingGroup("staging")}
                 />
               </div>
               {/* Bottom buttons */}
               <div className="mt-1.5 flex gap-1">
+                <a
+                  href="https://github.com/Connorelsea/pc-sprint-planner"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2 py-1 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-white/50 dark:hover:bg-white/10 rounded transition-colors flex items-center justify-center"
+                  title="View on GitHub"
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+                  </svg>
+                </a>
                 <button
                   onClick={() => setShowImportExport(true)}
                   className="flex-1 py-1 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-white/50 dark:hover:bg-white/10 rounded transition-colors flex items-center justify-center gap-1"
@@ -1760,82 +1735,187 @@ export default function SprintPlanner() {
               </div>
             </div>
 
-            {/* Main Content Grid */}
-            <div className="flex-1 grid grid-cols-3 grid-rows-2 gap-2 min-h-0">
-              <DroppableGroup
-                groupId="committed"
-                items={data.items.committed}
-                onUpdate={handleUpdateItem("committed")}
-                onDelete={handleDeleteItem("committed")}
-                onAdd={handleAddItem}
-                onDuplicate={handleDuplicateItem}
-                onReorder={handleReorderItem}
-                stats={{
-                  ...committedStats,
-                  percent: committedPercent,
-                  remaining: committedRemaining,
-                }}
-                hoveredEpic={hoveredEpic}
-                onEpicHover={setHoveredEpic}
-              />
-              <DroppableGroup
-                groupId="milestones"
-                items={data.items.milestones}
-                onUpdate={handleUpdateItem("milestones")}
-                onDelete={handleDeleteItem("milestones")}
-                onAdd={handleAddItem}
-                onDuplicate={handleDuplicateItem}
-                onReorder={handleReorderItem}
-                hoveredEpic={hoveredEpic}
-                onEpicHover={setHoveredEpic}
-              />
-              <DroppableGroup
-                groupId="risks"
-                items={data.items.risks}
-                onUpdate={handleUpdateItem("risks")}
-                onDelete={handleDeleteItem("risks")}
-                onAdd={handleAddItem}
-                onDuplicate={handleDuplicateItem}
-                onReorder={handleReorderItem}
-                hoveredEpic={hoveredEpic}
-                onEpicHover={setHoveredEpic}
-              />
-              <DroppableGroup
-                groupId="dependencies"
-                items={data.items.dependencies}
-                onUpdate={handleUpdateItem("dependencies")}
-                onDelete={handleDeleteItem("dependencies")}
-                onAdd={handleAddItem}
-                onDuplicate={handleDuplicateItem}
-                onReorder={handleReorderItem}
-                hoveredEpic={hoveredEpic}
-                onEpicHover={setHoveredEpic}
-              />
-              <DroppableGroup
-                groupId="willNotDo"
-                items={data.items.willNotDo}
-                onUpdate={handleUpdateItem("willNotDo")}
-                onDelete={handleDeleteItem("willNotDo")}
-                onAdd={handleAddItem}
-                onDuplicate={handleDuplicateItem}
-                onReorder={handleReorderItem}
-                stats={calcStats("willNotDo")}
-                hoveredEpic={hoveredEpic}
-                onEpicHover={setHoveredEpic}
-              />
-              <DroppableGroup
-                groupId="uncommitted"
-                items={data.items.uncommitted}
-                onUpdate={handleUpdateItem("uncommitted")}
-                onDelete={handleDeleteItem("uncommitted")}
-                onAdd={handleAddItem}
-                onDuplicate={handleDuplicateItem}
-                onReorder={handleReorderItem}
-                stats={calcStats("uncommitted")}
-                hoveredEpic={hoveredEpic}
-                onEpicHover={setHoveredEpic}
-              />
-            </div>
+            {/* Main Content - switches between normal grid and expanded view */}
+            {isExpandedMode ? (
+              /* Expanded Layout: Committed + Uncommitted full height, others in last column */
+              <div className="flex-1 grid grid-cols-3 gap-2 min-h-0">
+                {/* Column 1: Committed full height */}
+                <DroppableGroup
+                  groupId="committed"
+                  items={data.items.committed}
+                  onUpdate={handleUpdateItem("committed")}
+                  onDelete={handleDeleteItem("committed")}
+                  onAdd={handleAddItem}
+                  onDuplicate={handleDuplicateItem}
+                  onReorder={handleReorderItem}
+                  stats={{
+                    ...committedStats,
+                    percent: committedPercent,
+                    remaining: committedRemaining,
+                  }}
+                  hoveredEpic={hoveredEpic}
+                  onEpicHover={setHoveredEpic}
+                  onExport={() => setExportingGroup("committed")}
+                />
+                {/* Column 2: Uncommitted full height */}
+                <DroppableGroup
+                  groupId="uncommitted"
+                  items={data.items.uncommitted}
+                  onUpdate={handleUpdateItem("uncommitted")}
+                  onDelete={handleDeleteItem("uncommitted")}
+                  onAdd={handleAddItem}
+                  onDuplicate={handleDuplicateItem}
+                  onReorder={handleReorderItem}
+                  stats={calcStats("uncommitted")}
+                  hoveredEpic={hoveredEpic}
+                  onEpicHover={setHoveredEpic}
+                  onExport={() => setExportingGroup("uncommitted")}
+                />
+                {/* Column 3: Other 4 cards stacked */}
+                <div className="flex flex-col gap-2 min-h-0">
+                  <div className="flex-1 min-h-0">
+                    <DroppableGroup
+                      groupId="milestones"
+                      items={data.items.milestones}
+                      onUpdate={handleUpdateItem("milestones")}
+                      onDelete={handleDeleteItem("milestones")}
+                      onAdd={handleAddItem}
+                      onDuplicate={handleDuplicateItem}
+                      onReorder={handleReorderItem}
+                      hoveredEpic={hoveredEpic}
+                      onEpicHover={setHoveredEpic}
+                      onExport={() => setExportingGroup("milestones")}
+                    />
+                  </div>
+                  <div className="flex-1 min-h-0">
+                    <DroppableGroup
+                      groupId="risks"
+                      items={data.items.risks}
+                      onUpdate={handleUpdateItem("risks")}
+                      onDelete={handleDeleteItem("risks")}
+                      onAdd={handleAddItem}
+                      onDuplicate={handleDuplicateItem}
+                      onReorder={handleReorderItem}
+                      hoveredEpic={hoveredEpic}
+                      onEpicHover={setHoveredEpic}
+                      onExport={() => setExportingGroup("risks")}
+                    />
+                  </div>
+                  <div className="flex-1 min-h-0">
+                    <DroppableGroup
+                      groupId="dependencies"
+                      items={data.items.dependencies}
+                      onUpdate={handleUpdateItem("dependencies")}
+                      onDelete={handleDeleteItem("dependencies")}
+                      onAdd={handleAddItem}
+                      onDuplicate={handleDuplicateItem}
+                      onReorder={handleReorderItem}
+                      hoveredEpic={hoveredEpic}
+                      onEpicHover={setHoveredEpic}
+                      onExport={() => setExportingGroup("dependencies")}
+                    />
+                  </div>
+                  <div className="flex-1 min-h-0">
+                    <DroppableGroup
+                      groupId="willNotDo"
+                      items={data.items.willNotDo}
+                      onUpdate={handleUpdateItem("willNotDo")}
+                      onDelete={handleDeleteItem("willNotDo")}
+                      onAdd={handleAddItem}
+                      onDuplicate={handleDuplicateItem}
+                      onReorder={handleReorderItem}
+                      stats={calcStats("willNotDo")}
+                      hoveredEpic={hoveredEpic}
+                      onEpicHover={setHoveredEpic}
+                      onExport={() => setExportingGroup("willNotDo")}
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* Normal Layout: 3 columns x 2 rows grid */
+              <div className="flex-1 grid grid-cols-3 grid-rows-2 gap-2 min-h-0">
+                <DroppableGroup
+                  groupId="committed"
+                  items={data.items.committed}
+                  onUpdate={handleUpdateItem("committed")}
+                  onDelete={handleDeleteItem("committed")}
+                  onAdd={handleAddItem}
+                  onDuplicate={handleDuplicateItem}
+                  onReorder={handleReorderItem}
+                  stats={{
+                    ...committedStats,
+                    percent: committedPercent,
+                    remaining: committedRemaining,
+                  }}
+                  hoveredEpic={hoveredEpic}
+                  onEpicHover={setHoveredEpic}
+                  onExport={() => setExportingGroup("committed")}
+                />
+                <DroppableGroup
+                  groupId="milestones"
+                  items={data.items.milestones}
+                  onUpdate={handleUpdateItem("milestones")}
+                  onDelete={handleDeleteItem("milestones")}
+                  onAdd={handleAddItem}
+                  onDuplicate={handleDuplicateItem}
+                  onReorder={handleReorderItem}
+                  hoveredEpic={hoveredEpic}
+                  onEpicHover={setHoveredEpic}
+                  onExport={() => setExportingGroup("milestones")}
+                />
+                <DroppableGroup
+                  groupId="risks"
+                  items={data.items.risks}
+                  onUpdate={handleUpdateItem("risks")}
+                  onDelete={handleDeleteItem("risks")}
+                  onAdd={handleAddItem}
+                  onDuplicate={handleDuplicateItem}
+                  onReorder={handleReorderItem}
+                  hoveredEpic={hoveredEpic}
+                  onEpicHover={setHoveredEpic}
+                  onExport={() => setExportingGroup("risks")}
+                />
+                <DroppableGroup
+                  groupId="dependencies"
+                  items={data.items.dependencies}
+                  onUpdate={handleUpdateItem("dependencies")}
+                  onDelete={handleDeleteItem("dependencies")}
+                  onAdd={handleAddItem}
+                  onDuplicate={handleDuplicateItem}
+                  onReorder={handleReorderItem}
+                  hoveredEpic={hoveredEpic}
+                  onEpicHover={setHoveredEpic}
+                  onExport={() => setExportingGroup("dependencies")}
+                />
+                <DroppableGroup
+                  groupId="willNotDo"
+                  items={data.items.willNotDo}
+                  onUpdate={handleUpdateItem("willNotDo")}
+                  onDelete={handleDeleteItem("willNotDo")}
+                  onAdd={handleAddItem}
+                  onDuplicate={handleDuplicateItem}
+                  onReorder={handleReorderItem}
+                  stats={calcStats("willNotDo")}
+                  hoveredEpic={hoveredEpic}
+                  onEpicHover={setHoveredEpic}
+                  onExport={() => setExportingGroup("willNotDo")}
+                />
+                <DroppableGroup
+                  groupId="uncommitted"
+                  items={data.items.uncommitted}
+                  onUpdate={handleUpdateItem("uncommitted")}
+                  onDelete={handleDeleteItem("uncommitted")}
+                  onAdd={handleAddItem}
+                  onDuplicate={handleDuplicateItem}
+                  onReorder={handleReorderItem}
+                  stats={calcStats("uncommitted")}
+                  hoveredEpic={hoveredEpic}
+                  onEpicHover={setHoveredEpic}
+                  onExport={() => setExportingGroup("uncommitted")}
+                />
+              </div>
+            )}
           </div>
 
           <DragOverlay>
@@ -1848,6 +1928,36 @@ export default function SprintPlanner() {
             )}
           </DragOverlay>
         </DndContext>
+
+        {/* Expanded Mode Toggle */}
+        <button
+          onClick={() => setIsExpandedMode(!isExpandedMode)}
+          className="fixed bottom-4 right-4 px-4 py-2 bg-slate-700 dark:bg-slate-600 text-white text-sm rounded-lg shadow-lg hover:bg-slate-600 dark:hover:bg-slate-500 transition-colors flex items-center gap-2"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            {isExpandedMode ? (
+              <>
+                <rect x="3" y="3" width="7" height="7" />
+                <rect x="14" y="3" width="7" height="7" />
+                <rect x="3" y="14" width="7" height="7" />
+                <rect x="14" y="14" width="7" height="7" />
+              </>
+            ) : (
+              <>
+                <rect x="3" y="3" width="8" height="18" />
+                <rect x="13" y="3" width="8" height="18" />
+              </>
+            )}
+          </svg>
+          {isExpandedMode ? "Normal View" : "Expanded View"}
+        </button>
       </div>
 
       {/* Import/Export Modal */}
@@ -1856,6 +1966,14 @@ export default function SprintPlanner() {
         onClose={() => setShowImportExport(false)}
         currentData={JSON.stringify(data, null, 2)}
         onImport={handleImportData}
+      />
+
+      {/* Export Dialog */}
+      <ExportDialog
+        isOpen={exportingGroup !== null}
+        onClose={() => setExportingGroup(null)}
+        items={exportingGroup ? data.items[exportingGroup] : []}
+        groupLabel={exportingGroup ? GROUP_CONFIG[exportingGroup].label : ""}
       />
     </div>
   );
